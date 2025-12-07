@@ -14,7 +14,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import prompts from "@/data/prompts.json";
 
@@ -179,19 +178,21 @@ export function SamplesModal({ modelName, onClose }: SamplesModalProps) {
                     value={sample.id.toString()}
                     id={`sample-${sample.id}`}
                   >
-                    <AccordionTrigger className="hover:no-underline cursor-pointer">
-                      <div className="flex items-center gap-3 text-left">
-                        <Badge variant="outline" className="shrink-0">
-                          {promptInfo?.category ?? `Prompt ${sample.prompt_id}`}
-                        </Badge>
+                    <AccordionTrigger className="hover:no-underline py-3 px-4 rounded-lg bg-secondary transition-colors hover:bg-secondary/70 data-[state=open]:bg-secondary/80 cursor-pointer">
+                      <div className="flex items-center justify-between w-full pr-2">
+                        <div className="flex items-center gap-3 text-left">
+                          <span className="text-sm font-medium">
+                            {promptInfo?.category ?? `Prompt ${sample.prompt_id}`}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            #{sample.prompt_id}
+                          </span>
+                        </div>
                         {score !== null && (
-                          <Badge variant="secondary" className="font-mono shrink-0">
+                          <span className="text-sm font-mono text-muted-foreground">
                             {score.toFixed(1)}
-                          </Badge>
+                          </span>
                         )}
-                        <span className="text-sm text-muted-foreground truncate">
-                          #{sample.prompt_id}
-                        </span>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
@@ -304,11 +305,11 @@ function SampleContent({ response }: { response: SampleResponse }) {
 
         {/* Chapter sections - always visible */}
         {chapterTurns.map((turn, index) => (
-          <div key={index} className="space-y-1">
-            <div className="text-xs font-medium text-muted-foreground">
+          <div key={index} className="border rounded-lg p-4">
+            <div className="text-base font-semibold mb-3">
               Chapter {turn.chapter_number ?? turn.turn_index}
             </div>
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed bg-muted/30 p-3 rounded-lg">
+            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
               {turn.assistant_response || "No response"}
             </pre>
           </div>
