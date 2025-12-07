@@ -140,7 +140,7 @@ export function SamplesModal({ modelName, onClose }: SamplesModalProps) {
 
   return (
     <Dialog open={modelName !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[95vw] max-w-[1500px] h-[85vh] flex flex-col p-0">
+      <DialogContent className="w-[calc(100vw-100px)] max-w-[1200px] h-[calc(100vh-100px)] flex flex-col p-0 sm:max-w-[1200px]">
         <DialogHeader className="px-6 py-4 border-b shrink-0">
           <DialogTitle>Writing Samples — {modelName}</DialogTitle>
         </DialogHeader>

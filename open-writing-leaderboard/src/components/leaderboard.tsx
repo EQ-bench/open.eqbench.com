@@ -89,7 +89,7 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 cursor-pointer hover:bg-accent/80"
                       onClick={() => setSamplesModalModel(rating.model_name)}
                       title="View writing samples"
                     >
@@ -100,7 +100,7 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-8 w-8 cursor-pointer hover:bg-accent/80"
                       onClick={() => setAnalysisModalModel(rating.model_name)}
                       title="View lexical analysis"
                     >
