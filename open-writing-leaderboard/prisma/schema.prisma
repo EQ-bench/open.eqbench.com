@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model alembic_version {
+  version_num String @id(map: "alembic_version_pkc") @db.VarChar(32)
+}
+
+model elo_comparisons {
+  id                         Int     @id @default(autoincrement())
+  run_key                    String? @db.VarChar
+  item_id                    String  @db.VarChar
+  model_a                    String  @db.VarChar
+  model_a_iteration_id       String  @db.VarChar
+  model_b                    String  @db.VarChar
+  model_b_iteration_id       String  @db.VarChar
+  aggregated_judge_responses Json?   @db.Json
+  aggregated_plus_for_a      Int?
+  aggregated_plus_for_b      Int?
+  fraction_for_a             Float?
+  runs                       runs?   @relation(fields: [run_key], references: [run_key], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([model_a, model_b], map: "ix_elo_model_pair")
+}
+
+model elo_ratings {
+  model_name   String    @id @db.VarChar
+  elo          Float?
+  elo_norm     Float?
+  sigma        Float?
+  ci_low       Float?
+  ci_high      Float?
+  ci_low_norm  Float?
+  ci_high_norm Float?
+  last_updated DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model judge_models {
+  name          String  @id @db.VarChar
+  model_id      String  @db.VarChar
+  provider      String  @db.VarChar
+  api_key       String? @db.VarChar
+  base_url      String  @db.VarChar
+  system_prompt String?
+}
+
+model judge_results {
+  id                Int     @id @default(autoincrement())
+  task_id           Int
+  judge_model_name  String  @db.VarChar
+  judge_order_index Int
+  raw_judge_text    String?
+  judge_scores      Json?   @db.Json
+  tasks             tasks   @relation(fields: [task_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([task_id], map: "ix_judge_results_task_id")
+}
+
+model run_logs {
+  id      Int      @id @default(autoincrement())
+  run_key String   @db.VarChar
+  ts      DateTime @default(now()) @db.Timestamptz(6)
+  stream  String   @db.VarChar
+  data    String
+  runs    runs     @relation(fields: [run_key], references: [run_key], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([run_key], map: "ix_run_logs_run_key")
+  @@index([run_key, ts], map: "ix_run_logs_run_key_ts")
+  @@index([ts], map: "ix_run_logs_ts")
+}
+
+model runs {
+  run_key         String            @id @db.VarChar
+  test_model      String            @db.VarChar
+  start_time      DateTime?         @default(now()) @db.Timestamptz(6)
+  end_time        DateTime?         @db.Timestamptz(6)
+  status          String            @db.VarChar
+  run_config      Json              @db.Json
+  results         Json?             @db.Json
+  elo_comparisons elo_comparisons[]
+  run_logs        run_logs[]
+  tasks           tasks[]
+
+  @@index([status], map: "ix_runs_status")
+}
+
+model tasks {
+  id                Int             @id @default(autoincrement())
+  run_key           String          @db.VarChar
+  prompt_id         String          @db.VarChar
+  iteration_index   Int
+  status            String          @db.VarChar
+  model_response    String?
+  error_message     String?         @db.VarChar
+  aggregated_scores Json?           @db.Json
+  model_responses   Json?           @db.Json
+  judge_results     judge_results[]
+  runs              runs            @relation(fields: [run_key], references: [run_key], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([run_key, prompt_id, iteration_index], map: "_run_prompt_iter_uc")
+  @@index([run_key, status], map: "ix_tasks_run_key_status")
+  @@index([status], map: "ix_tasks_status")
+}
