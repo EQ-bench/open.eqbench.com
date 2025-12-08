@@ -8,18 +8,20 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-14 items-center px-4">
-        <a href="https://eqbench.com" className="flex items-center space-x-3">
-          <Image
-            src="/eqbench_pixel_logo.png"
-            alt="EQ-Bench Logo"
-            width={32}
-            height={32}
-            className="h-8 w-8"
-          />
-          <span className="text-xl font-bold tracking-tight">
+        <div className="flex items-center space-x-3">
+          <a href="https://eqbench.com" className="flex-shrink-0">
+            <Image
+              src="/eqbench_pixel_logo.png"
+              alt="EQ-Bench Logo"
+              width={32}
+              height={32}
+              className="h-8 w-8 min-w-8"
+            />
+          </a>
+          <a href="/" className="text-xl font-bold tracking-tight">
             EQ-Bench Open Writing Leaderboard
-          </span>
-        </a>
+          </a>
+        </div>
         <nav className="ml-auto flex items-center space-x-4">
           <QueueMonitor />
           <ThemeToggle />

@@ -77,8 +77,8 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">Rank</TableHead>
-              <TableHead className="min-w-[200px] w-[60%]">Model</TableHead>
-              <TableHead className="min-w-[200px] w-[40%]">ELO Score</TableHead>
+              <TableHead className="min-w-[133px] w-[60%]">Model</TableHead>
+              <TableHead className="min-w-[100px] w-[40%]">ELO Score</TableHead>
               <TableHead className="w-24 text-center"><span className="hidden sm:inline">Samples</span></TableHead>
               <TableHead className="w-24 text-center"><span className="hidden sm:inline">Analysis</span></TableHead>
             </TableRow>
