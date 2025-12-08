@@ -106,3 +106,117 @@ model tasks {
   @@index([run_key, status], map: "ix_tasks_run_key_status")
   @@index([status], map: "ix_tasks_status")
 }
+
+model event_log {
+  id            Int       @id @default(autoincrement())
+  event_type    String    @db.VarChar
+  submission_id String?   @db.VarChar
+  user_id       String?   @db.VarChar
+  ip            String?   @db.VarChar
+  details       Json?     @db.Json
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at], map: "ix_event_log_created_at")
+  @@index([event_type], map: "ix_event_log_event_type")
+  @@index([submission_id], map: "ix_event_log_submission_id")
+  @@index([user_id], map: "ix_event_log_user_id")
+}
+
+model heartbeat {
+  id         Int       @id @default(autoincrement())
+  host       String?   @db.VarChar
+  pid        Int?
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+  details    Json?     @db.Json
+
+  @@index([updated_at], map: "ix_heartbeat_updated_at")
+}
+
+model leaderboard_cache {
+  id          Int       @id @default(autoincrement())
+  snapshot_at DateTime? @default(now()) @db.Timestamptz(6)
+  data        Json      @db.Json
+}
+
+model likes {
+  id            Int         @id @default(autoincrement())
+  submission_id String      @db.VarChar
+  user_id       String?     @db.VarChar
+  ip_hash       String      @db.VarChar
+  created_at    DateTime?   @default(now()) @db.Timestamptz(6)
+  submissions   submissions @relation(fields: [submission_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users         users?      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([submission_id, ip_hash], map: "uq_like_submission_iphash")
+  @@unique([submission_id, user_id], map: "uq_like_submission_user")
+  @@index([submission_id], map: "ix_likes_submission_id")
+}
+
+model queue_tokens {
+  id           Int       @id @default(autoincrement())
+  user_id      String?   @db.VarChar
+  window_start DateTime? @default(now()) @db.Timestamptz(6)
+  submit_count Int
+  users        users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id], map: "ix_queue_tokens_user_id")
+  @@index([window_start], map: "ix_queue_tokens_window_start")
+}
+
+model settings {
+  key   String @id @db.VarChar
+  value Json   @db.Json
+}
+
+model submissions {
+  id              String           @id @db.VarChar
+  user_id         String?          @db.VarChar
+  created_ip      String?          @db.VarChar
+  status          submissionstatus
+  params          Json             @db.Json
+  priority_score  Int
+  attempts        Int
+  max_runtime_sec Int
+  run_key         String?          @db.VarChar
+  runpod_pod_id   String?          @db.VarChar
+  started_at      DateTime?        @db.Timestamptz(6)
+  finished_at     DateTime?        @db.Timestamptz(6)
+  error_msg       String?
+  created_at      DateTime?        @default(now()) @db.Timestamptz(6)
+  likes           likes[]
+  users           users?           @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at], map: "ix_submissions_created_at")
+  @@index([run_key], map: "ix_submissions_run_key")
+  @@index([runpod_pod_id], map: "ix_submissions_runpod_pod_id")
+  @@index([status], map: "ix_submissions_status")
+  @@index([user_id], map: "ix_submissions_user_id")
+  @@index([user_id, status], map: "ix_submissions_user_status")
+}
+
+model users {
+  id            String         @id @db.VarChar
+  email         String?        @db.VarChar
+  auth_provider String?        @db.VarChar
+  auth_subject  String?        @db.VarChar
+  created_at    DateTime?      @default(now()) @db.Timestamptz(6)
+  last_ip       String?        @db.VarChar
+  is_banned     Boolean
+  role          String?        @db.VarChar
+  likes         likes[]
+  queue_tokens  queue_tokens[]
+  submissions   submissions[]
+
+  @@index([email], map: "ix_users_email")
+}
+
+enum submissionstatus {
+  SUBMITTED
+  QUEUED
+  STARTING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  TIMEOUT
+  CANCELLED
+}

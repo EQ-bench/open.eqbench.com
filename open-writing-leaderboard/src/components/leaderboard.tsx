@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, BarChart3 } from "lucide-react";
+import { FileText, BarChart3, ExternalLink } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -27,6 +27,30 @@ interface LeaderboardProps {
   ratings: Rating[];
 }
 
+/**
+ * Extract the Hugging Face model page URL from various model name formats:
+ * - "deepseek-ai/DeepSeek-V3.2" -> "https://huggingface.co/deepseek-ai/DeepSeek-V3.2"
+ * - "deepseek-ai/DeepSeek-V3.2:*Q3_K_M.gguf" -> "https://huggingface.co/deepseek-ai/DeepSeek-V3.2"
+ * - "https://huggingface.co/unsloth/Qwen3-Next-80B-A3B-Instruct-GGUF/tree/main/Q8_0:*Q8_0*.gguf" -> "https://huggingface.co/unsloth/Qwen3-Next-80B-A3B-Instruct-GGUF"
+ */
+function getHuggingFaceUrl(modelName: string): string {
+  // If it's already a full URL, extract org/model from the path
+  if (modelName.startsWith("https://huggingface.co/")) {
+    const urlPath = modelName.replace("https://huggingface.co/", "");
+    // Extract just org/model (first two path segments)
+    const parts = urlPath.split("/");
+    if (parts.length >= 2) {
+      return `https://huggingface.co/${parts[0]}/${parts[1]}`;
+    }
+    return modelName.split(":")[0]; // fallback
+  }
+
+  // Remove any filename pattern suffix (after colon)
+  const baseModel = modelName.split(":")[0];
+
+  return `https://huggingface.co/${baseModel}`;
+}
+
 export function Leaderboard({ ratings }: LeaderboardProps) {
   const [samplesModalModel, setSamplesModalModel] = useState<string | null>(null);
   const [analysisModalModel, setAnalysisModalModel] = useState<string | null>(null);
@@ -48,7 +72,7 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
 
   return (
     <>
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-lg border-2 border-violet-400/70 bg-card shadow-[0_0_15px_rgba(167,139,250,0.3)]">
         <Table>
           <TableHeader>
             <TableRow>
@@ -70,7 +94,15 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-medium">
-                    {rating.model_name}
+                    <a
+                      href={getHuggingFaceUrl(rating.model_name)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 hover:text-primary hover:underline"
+                    >
+                      {rating.model_name}
+                      <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 opacity-50" />
+                    </a>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">

@@ -1,16 +1,27 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggle } from "./theme-toggle";
+import { PaletteSwitcher } from "./palette-switcher";
+import { UserMenu } from "./user-menu";
 
 export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-14 items-center px-4">
-        <Link href="/" className="flex items-center space-x-2">
+        <Link href="/" className="flex items-center space-x-3">
+          <Image
+            src="/eqbench_pixel_logo.png"
+            alt="EQ-Bench Logo"
+            width={32}
+            height={32}
+            className="h-8 w-8"
+          />
           <span className="text-xl font-bold tracking-tight">
-            Open Writing Leaderboard
+            EQ-Bench Open Writing Leaderboard
           </span>
         </Link>
         <nav className="ml-auto flex items-center space-x-4">
+          <PaletteSwitcher />
           <Link
             href="https://github.com/EQ-bench/EQ-Bench"
             target="_blank"
@@ -20,6 +31,7 @@ export function Header() {
             GitHub
           </Link>
           <ThemeToggle />
+          <UserMenu />
         </nav>
       </div>
     </header>
