@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ListOrdered, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Timer, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -148,7 +148,7 @@ export function QueueMonitor() {
           className="gap-2 relative"
           title="View submission queue"
         >
-          <ListOrdered className="h-4 w-4" />
+          <Timer className="h-4 w-4" />
           {queueCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
               {queueCount > 9 ? "9+" : queueCount}
@@ -159,7 +159,7 @@ export function QueueMonitor() {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ListOrdered className="h-5 w-5" />
+            <Timer className="h-5 w-5" />
             Submission Queue
             {loading && <Loader2 className="h-4 w-4 animate-spin ml-2" />}
           </DialogTitle>

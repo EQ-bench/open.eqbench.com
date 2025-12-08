@@ -72,7 +72,7 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
 
   return (
     <>
-      <div className="rounded-lg border-2 border-violet-400/70 bg-card shadow-[0_0_15px_rgba(167,139,250,0.3)]">
+      <div className="rounded-lg border-2 border-violet-400/50 dark:border-violet-400/70 bg-card shadow-[0_0_15px_rgba(167,139,250,0.15)] dark:shadow-[0_0_15px_rgba(167,139,250,0.3)]">
         <Table>
           <TableHeader>
             <TableRow>
