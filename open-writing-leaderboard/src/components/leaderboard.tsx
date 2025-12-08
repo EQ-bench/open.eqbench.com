@@ -77,10 +77,10 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">Rank</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead className="w-[300px]">ELO Score</TableHead>
-              <TableHead className="w-24 text-center">Samples</TableHead>
-              <TableHead className="w-24 text-center">Analysis</TableHead>
+              <TableHead className="min-w-[200px] w-[60%]">Model</TableHead>
+              <TableHead className="min-w-[200px] w-[40%]">ELO Score</TableHead>
+              <TableHead className="w-24 text-center"><span className="hidden sm:inline">Samples</span></TableHead>
+              <TableHead className="w-24 text-center"><span className="hidden sm:inline">Analysis</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -93,15 +93,15 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
                       {rank}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium whitespace-normal break-all">
                     <a
                       href={getHuggingFaceUrl(rating.model_name)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 hover:text-primary hover:underline"
+                      className="hover:text-primary hover:underline"
                     >
                       {rating.model_name}
-                      <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 opacity-50" />
+                      <ExternalLink className="h-3.5 w-3.5 inline-block ml-1.5 flex-shrink-0 opacity-50" />
                     </a>
                   </TableCell>
                   <TableCell>
