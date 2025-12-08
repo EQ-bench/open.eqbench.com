@@ -20,7 +20,6 @@ export function SubmissionLogs({ submissionId, initialStatus }: SubmissionLogsPr
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [status, setStatus] = useState(initialStatus);
-  const lastLogIdRef = useRef<number | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -28,23 +27,13 @@ export function SubmissionLogs({ submissionId, initialStatus }: SubmissionLogsPr
 
   const fetchLogs = useCallback(async () => {
     try {
-      const url = lastLogIdRef.current
-        ? `/api/submissions/${submissionId}/logs?after=${lastLogIdRef.current}`
-        : `/api/submissions/${submissionId}/logs`;
-
-      const response = await fetch(url);
+      const response = await fetch(`/api/submissions/${submissionId}/logs`);
       if (!response.ok) return;
 
       const data = await response.json();
 
-      if (data.logs && data.logs.length > 0) {
-        setLogs((prev) => {
-          // Deduplicate by ID to prevent duplicate key errors
-          const existingIds = new Set(prev.map((l) => l.id));
-          const newLogs = data.logs.filter((l: LogEntry) => !existingIds.has(l.id));
-          return [...prev, ...newLogs];
-        });
-        lastLogIdRef.current = data.logs[data.logs.length - 1].id;
+      if (data.logs) {
+        setLogs(data.logs);
       }
 
       if (data.status) {
@@ -70,30 +59,19 @@ export function SubmissionLogs({ submissionId, initialStatus }: SubmissionLogsPr
 
   // Auto-scroll to bottom
   useEffect(() => {
-    if (autoScroll && logsEndRef.current) {
+    if (autoScroll && logsEndRef.current && containerRef.current) {
       logsEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [logs, autoScroll]);
 
-  // Detect manual scroll to disable auto-scroll
-  const handleScroll = () => {
-    if (!containerRef.current) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
-
-    if (!isAtBottom && autoScroll) {
-      setAutoScroll(false);
-    }
-  };
 
   const formatTimestamp = (ts: string) => {
+    // Use UTC format to avoid hydration mismatch between server and client
     const date = new Date(ts);
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+    const hours = date.getUTCHours().toString().padStart(2, "0");
+    const minutes = date.getUTCMinutes().toString().padStart(2, "0");
+    const seconds = date.getUTCSeconds().toString().padStart(2, "0");
+    return `${hours}:${minutes}:${seconds}`;
   };
 
   const getStreamColor = (stream: string) => {
@@ -133,7 +111,6 @@ export function SubmissionLogs({ submissionId, initialStatus }: SubmissionLogsPr
       <CardContent>
         <div
           ref={containerRef}
-          onScroll={handleScroll}
           className="bg-muted rounded-lg p-4 h-80 overflow-y-auto font-mono text-xs"
         >
           {logs.length === 0 ? (
