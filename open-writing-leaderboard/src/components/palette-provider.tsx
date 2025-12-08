@@ -287,7 +287,7 @@ export function usePalette() {
 }
 
 export function PaletteProvider({ children }: { children: React.ReactNode }) {
-  const [palette, setPaletteState] = React.useState<PaletteKey>("default");
+  const [palette, setPaletteState] = React.useState<PaletteKey>("lavender");
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -295,6 +295,9 @@ export function PaletteProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("palette") as PaletteKey | null;
     if (stored && palettes[stored]) {
       setPaletteState(stored);
+    } else {
+      // Default to lavender if no stored preference
+      setPaletteState("lavender");
     }
   }, []);
 

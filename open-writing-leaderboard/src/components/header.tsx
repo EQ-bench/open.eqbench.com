@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggle } from "./theme-toggle";
-import { PaletteSwitcher } from "./palette-switcher";
 import { UserMenu } from "./user-menu";
+import { SubmitButton } from "./submit-button";
+import { QueueMonitor } from "./queue-monitor";
 
 export function Header() {
   return (
@@ -21,7 +22,6 @@ export function Header() {
           </span>
         </Link>
         <nav className="ml-auto flex items-center space-x-4">
-          <PaletteSwitcher />
           <Link
             href="https://github.com/EQ-bench/EQ-Bench"
             target="_blank"
@@ -30,7 +30,9 @@ export function Header() {
           >
             GitHub
           </Link>
+          <QueueMonitor />
           <ThemeToggle />
+          <SubmitButton />
           <UserMenu />
         </nav>
       </div>

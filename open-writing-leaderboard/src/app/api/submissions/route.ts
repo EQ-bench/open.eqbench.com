@@ -56,8 +56,8 @@ const ALLOWED_QUANTIZATION_METHODS = new Set([
 // Judge models for evaluation
 const JUDGE_MODELS = [
   "grok-4.1-fast",
-  "claude-haiku-4.5",
-  "kimi-k2-0905",
+  //"claude-haiku-4.5",
+  //"kimi-k2-0905",
 ];
 
 interface VllmEnvVars {
