@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { Leaderboard } from "@/components/leaderboard";
 
 export const dynamic = "force-dynamic";
@@ -20,12 +21,27 @@ async function getLeaderboardData() {
   return ratings;
 }
 
+async function getUserRole() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+
+  const user = await prisma.users.findUnique({
+    where: { auth_subject: session.user.id },
+    select: { role: true },
+  });
+
+  return user?.role ?? null;
+}
+
 export default async function Home() {
-  const ratings = await getLeaderboardData();
+  const [ratings, userRole] = await Promise.all([
+    getLeaderboardData(),
+    getUserRole(),
+  ]);
 
   return (
     <div className="space-y-8">
-      <Leaderboard ratings={ratings} />
+      <Leaderboard ratings={ratings} isAdmin={userRole === "admin"} />
     </div>
   );
 }

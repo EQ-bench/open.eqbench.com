@@ -198,7 +198,7 @@ model users {
   id            String         @id @db.VarChar
   email         String?        @db.VarChar
   auth_provider String?        @db.VarChar
-  auth_subject  String?        @db.VarChar
+  auth_subject  String?        @unique @db.VarChar
   created_at    DateTime?      @default(now()) @db.Timestamptz(6)
   last_ip       String?        @db.VarChar
   is_banned     Boolean

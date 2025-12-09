@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, BarChart3, ExternalLink } from "lucide-react";
+import { FileText, BarChart3, ExternalLink, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -25,6 +26,7 @@ interface Rating {
 
 interface LeaderboardProps {
   ratings: Rating[];
+  isAdmin?: boolean;
 }
 
 /**
@@ -51,9 +53,37 @@ function getHuggingFaceUrl(modelName: string): string {
   return `https://huggingface.co/${baseModel}`;
 }
 
-export function Leaderboard({ ratings }: LeaderboardProps) {
+export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
+  const router = useRouter();
   const [samplesModalModel, setSamplesModalModel] = useState<string | null>(null);
   const [analysisModalModel, setAnalysisModalModel] = useState<string | null>(null);
+  const [deletingModel, setDeletingModel] = useState<string | null>(null);
+
+  const handleDelete = async (modelName: string) => {
+    if (!confirm(`Are you sure you want to delete "${modelName}" from the leaderboard?\n\nThis will also delete all associated runs and data. This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingModel(modelName);
+    try {
+      const response = await fetch(`/api/admin/leaderboard?model=${encodeURIComponent(modelName)}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(data.error || "Failed to delete");
+        return;
+      }
+
+      router.refresh();
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Failed to delete leaderboard entry");
+    } finally {
+      setDeletingModel(null);
+    }
+  };
 
   const maxElo = Math.max(...ratings.map((r) => r.elo ?? 0));
   const minElo = Math.min(...ratings.map((r) => r.elo ?? 0));
@@ -81,6 +111,7 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
               <TableHead className="min-w-[100px] w-[40%]">ELO Score</TableHead>
               <TableHead className="w-24 text-center"><span className="hidden sm:inline">Samples</span></TableHead>
               <TableHead className="w-24 text-center"><span className="hidden sm:inline">Analysis</span></TableHead>
+              {isAdmin && <TableHead className="w-16 text-center"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -139,6 +170,20 @@ export function Leaderboard({ ratings }: LeaderboardProps) {
                       <BarChart3 className="h-4 w-4" />
                     </Button>
                   </TableCell>
+                  {isAdmin && (
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 cursor-pointer hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => handleDelete(rating.model_name)}
+                        disabled={deletingModel === rating.model_name}
+                        title="Delete from leaderboard"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}

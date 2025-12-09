@@ -94,8 +94,18 @@ export default async function SubmissionsPage() {
     redirect("/auth/signin");
   }
 
+  // Look up user by auth_subject to get their DB id
+  const user = await prisma.users.findUnique({
+    where: { auth_subject: session.user.id },
+    select: { id: true },
+  });
+
+  if (!user) {
+    redirect("/auth/signin");
+  }
+
   const submissions = await prisma.submissions.findMany({
-    where: { user_id: session.user.id },
+    where: { user_id: user.id },
     orderBy: { created_at: "desc" },
     take: 50,
   });

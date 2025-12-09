@@ -39,14 +39,13 @@ export const authConfig: NextAuthConfig = {
         return false;
       }
 
-      // Upsert user in database
+      // Upsert user in database by auth_subject (stable HF user identifier)
       try {
         await prisma.users.upsert({
-          where: { id: user.id },
+          where: { auth_subject: account.providerAccountId },
           update: {
             email: user.email,
             auth_provider: account.provider,
-            auth_subject: account.providerAccountId,
           },
           create: {
             id: user.id,
@@ -69,8 +68,11 @@ export const authConfig: NextAuthConfig = {
       }
       return session;
     },
-    async jwt({ token, user }) {
-      if (user) {
+    async jwt({ token, user, account }) {
+      // On initial sign in, use the HuggingFace account ID as the stable identifier
+      if (account?.providerAccountId) {
+        token.sub = account.providerAccountId;
+      } else if (user?.id) {
         token.sub = user.id;
       }
       return token;

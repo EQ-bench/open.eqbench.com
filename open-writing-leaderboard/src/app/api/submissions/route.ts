@@ -233,12 +233,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user is banned
+    // Look up user by auth_subject (session.user.id is the HF provider ID)
     const user = await prisma.users.findUnique({
-      where: { id: session.user.id },
+      where: { auth_subject: session.user.id },
     });
 
-    if (user?.is_banned) {
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    if (user.is_banned) {
       return NextResponse.json(
         { error: "Your account has been suspended" },
         { status: 403 }
@@ -264,8 +271,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check rate limits
-    const rateLimitResult = await checkRateLimit(session.user.id, ipHash);
+    // Check rate limits (use user.id which is the DB primary key)
+    const rateLimitResult = await checkRateLimit(user.id, ipHash);
     if (!rateLimitResult.allowed) {
       return NextResponse.json(
         {
@@ -384,7 +391,7 @@ export async function POST(request: NextRequest) {
     const submission = await prisma.submissions.create({
       data: {
         id: submissionId,
-        user_id: session.user.id,
+        user_id: user.id,
         created_ip: ipHash,
         status: submissionstatus.SUBMITTED,
         params: params,
@@ -399,7 +406,7 @@ export async function POST(request: NextRequest) {
       data: {
         event_type: "submission_created",
         submission_id: submission.id,
-        user_id: session.user.id,
+        user_id: user.id,
         ip: ipHash,
         details: {
           modelType: body.modelType,
@@ -434,13 +441,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Look up user by auth_subject to get their DB id
+    const user = await prisma.users.findUnique({
+      where: { auth_subject: session.user.id },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100);
     const offset = parseInt(searchParams.get("offset") || "0");
 
     const [submissions, total] = await Promise.all([
       prisma.submissions.findMany({
-        where: { user_id: session.user.id },
+        where: { user_id: user.id },
         orderBy: { created_at: "desc" },
         take: limit,
         skip: offset,
@@ -456,7 +476,7 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.submissions.count({
-        where: { user_id: session.user.id },
+        where: { user_id: user.id },
       }),
     ]);
 
