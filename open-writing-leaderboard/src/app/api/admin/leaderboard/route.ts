@@ -42,11 +42,10 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Find all successful runs for this model
+    // Find all runs for this model (any status)
     const runs = await prisma.runs.findMany({
       where: {
         test_model: modelName,
-        status: "succeeded",
       },
       select: { run_key: true },
     });
@@ -81,25 +80,39 @@ export async function DELETE(request: NextRequest) {
           where: { run_key: { in: runKeys } },
         });
 
-        // 5. Delete the runs themselves
+        // 5. Delete likes for submissions associated with these runs
+        await tx.likes.deleteMany({
+          where: {
+            submissions: {
+              run_key: { in: runKeys },
+            },
+          },
+        });
+
+        // 6. Delete submissions associated with these runs
+        await tx.submissions.deleteMany({
+          where: { run_key: { in: runKeys } },
+        });
+
+        // 7. Delete the runs themselves
         await tx.runs.deleteMany({
           where: { run_key: { in: runKeys } },
         });
       }
 
-      // 6. Delete elo_comparisons that reference this model (even if no run_key)
+      // 8. Delete elo_comparisons that reference this model (even if no run_key)
       await tx.elo_comparisons.deleteMany({
         where: {
           OR: [{ model_a: modelName }, { model_b: modelName }],
         },
       });
 
-      // 7. Delete the elo_rating entry
+      // 9. Delete the elo_rating entry
       await tx.elo_ratings.delete({
         where: { model_name: modelName },
       });
 
-      // 8. Log the deletion event
+      // 10. Log the deletion event
       await tx.event_log.create({
         data: {
           event_type: "leaderboard_entry_deleted",

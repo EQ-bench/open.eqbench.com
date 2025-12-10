@@ -79,7 +79,7 @@ const METRIC_CONFIG: Record<
   },
   avg_paragraph_length: {
     label: "Avg Paragraph Length",
-    description: "Average number of sentences per paragraph",
+    description: "Average number of words per paragraph",
     decimals: 1,
   },
   mattr_500: {
