@@ -51,6 +51,8 @@ export default async function SubmissionPage({ params }: SubmissionPageProps) {
         start_time: true,
         end_time: true,
         results: true,
+        generation_progress: true,
+        judging_progress: true,
       },
     });
   }
@@ -73,6 +75,29 @@ export default async function SubmissionPage({ params }: SubmissionPageProps) {
         ...runInfo,
         start_time: runInfo.start_time?.toISOString() || null,
         end_time: runInfo.end_time?.toISOString() || null,
+        generation_progress: runInfo.generation_progress as {
+          total_tasks: number;
+          total_turns: number;
+          completed_turns: number;
+          tasks_by_status: {
+            initialized?: number;
+            generating?: number;
+            generated?: number;
+            error?: number;
+          };
+        } | null,
+        judging_progress: runInfo.judging_progress as {
+          rubric: {
+            total_tasks: number;
+            completed_tasks: number;
+            error_tasks: number;
+          };
+          elo: {
+            current_stage: number;
+            total_stages: number;
+            comparisons_completed: number;
+          };
+        } | null,
       }
     : null;
 

@@ -39,6 +39,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           start_time: true,
           end_time: true,
           results: true,
+          generation_progress: true,
+          judging_progress: true,
         },
       });
     }

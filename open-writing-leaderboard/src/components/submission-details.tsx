@@ -11,7 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Clock, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { ExternalLink, Clock, CheckCircle2, XCircle, Loader2, Sparkles, Scale } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 type SubmissionStatus = "SUBMITTED" | "QUEUED" | "STARTING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMEOUT" | "CANCELLED";
 
@@ -30,6 +31,31 @@ interface SubmissionData {
   run_key: string | null;
 }
 
+interface GenerationProgress {
+  total_tasks: number;
+  total_turns: number;
+  completed_turns: number;
+  tasks_by_status?: {
+    initialized?: number;
+    generating?: number;
+    generated?: number;
+    error?: number;
+  };
+}
+
+interface JudgingProgress {
+  rubric: {
+    total_tasks: number;
+    completed_tasks: number;
+    error_tasks: number;
+  };
+  elo: {
+    current_stage: number;
+    total_stages: number;
+    comparisons_completed: number;
+  };
+}
+
 interface RunInfo {
   run_key: string;
   test_model: string | null;
@@ -37,6 +63,8 @@ interface RunInfo {
   start_time: string | null;
   end_time: string | null;
   results: unknown;
+  generation_progress: GenerationProgress | null;
+  judging_progress: JudgingProgress | null;
 }
 
 interface SubmissionDetailsProps {
@@ -208,6 +236,159 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
         </CardHeader>
 
       </Card>
+
+      {/* Progress Card - show when we have progress data */}
+      {runInfo && (runInfo.generation_progress || runInfo.judging_progress) && (() => {
+        const genProgress = runInfo.generation_progress;
+        const judgingProgress = runInfo.judging_progress;
+
+        // Determine completion states
+        const generationComplete = genProgress &&
+          genProgress.completed_turns >= genProgress.total_turns;
+        const rubricComplete = judgingProgress &&
+          judgingProgress.rubric.completed_tasks >= judgingProgress.rubric.total_tasks;
+        // ELO is complete when the task is succeeded (all judging done)
+        const eloComplete = submission.status === "SUCCEEDED";
+
+        return (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Evaluation Progress</CardTitle>
+              <CardDescription>
+                {isInProgress ? "Real-time progress of your model evaluation" : "Evaluation completed"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Generation Progress */}
+              {genProgress && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    {generationComplete ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 text-blue-500" />
+                    )}
+                    <span className="text-sm font-medium">Generation</span>
+                    {generationComplete && (
+                      <Badge variant="outline" className="text-green-600 border-green-600/30 text-xs">
+                        Complete
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Turns completed</span>
+                      <span className="font-mono">
+                        {genProgress.completed_turns} / {genProgress.total_turns}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <Progress
+                        value={(genProgress.completed_turns / genProgress.total_turns) * 100}
+                        className={`h-2 ${generationComplete ? '[&>div]:bg-green-500' : ''} ${!generationComplete ? '[&>div]:animate-pulse' : ''}`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Task status breakdown */}
+                  {genProgress.tasks_by_status && (
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {genProgress.tasks_by_status.generating !== undefined &&
+                       genProgress.tasks_by_status.generating > 0 && (
+                        <Badge variant="secondary" className="gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          {genProgress.tasks_by_status.generating} generating
+                        </Badge>
+                      )}
+                      {genProgress.tasks_by_status.generated !== undefined &&
+                       genProgress.tasks_by_status.generated > 0 && (
+                        <Badge variant="outline" className="gap-1 text-green-600 border-green-600/30">
+                          <CheckCircle2 className="h-3 w-3" />
+                          {genProgress.tasks_by_status.generated} completed
+                        </Badge>
+                      )}
+                      {genProgress.tasks_by_status.error !== undefined &&
+                       genProgress.tasks_by_status.error > 0 && (
+                        <Badge variant="outline" className="gap-1 text-destructive border-destructive/30">
+                          <XCircle className="h-3 w-3" />
+                          {genProgress.tasks_by_status.error} errors
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Judging Progress */}
+              {judgingProgress && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    {rubricComplete && eloComplete ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Scale className="h-4 w-4 text-purple-500" />
+                    )}
+                    <span className="text-sm font-medium">Judging</span>
+                    {rubricComplete && eloComplete && (
+                      <Badge variant="outline" className="text-green-600 border-green-600/30 text-xs">
+                        Complete
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Rubric judging */}
+                  <div className="space-y-2 pl-6">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Rubric scoring</span>
+                      <span className="font-mono">
+                        {judgingProgress.rubric.completed_tasks} / {judgingProgress.rubric.total_tasks}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <Progress
+                        value={(judgingProgress.rubric.completed_tasks / judgingProgress.rubric.total_tasks) * 100}
+                        className={`h-2 ${rubricComplete ? '[&>div]:bg-green-500' : ''} ${!rubricComplete ? '[&>div]:animate-pulse' : ''}`}
+                      />
+                    </div>
+                    {judgingProgress.rubric.error_tasks > 0 && (
+                      <Badge variant="outline" className="gap-1 text-destructive border-destructive/30 text-xs">
+                        <XCircle className="h-3 w-3" />
+                        {judgingProgress.rubric.error_tasks} errors
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* ELO comparisons */}
+                  <div className="space-y-2 pl-6">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">ELO comparisons</span>
+                      <span className="font-mono">
+                        {eloComplete
+                          ? `${judgingProgress.elo.total_stages} stages complete`
+                          : `Processing stage ${judgingProgress.elo.current_stage} of ${judgingProgress.elo.total_stages}`
+                        }
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <Progress
+                        value={eloComplete
+                          ? 100
+                          : ((judgingProgress.elo.current_stage - 1) / judgingProgress.elo.total_stages) * 100
+                        }
+                        className={`h-2 ${eloComplete ? '[&>div]:bg-green-500' : ''} ${!eloComplete ? '[&>div]:animate-pulse' : ''}`}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {judgingProgress.elo.comparisons_completed} comparisons completed
+                    </span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Model Details Card */}
       <Card className="mb-6">
