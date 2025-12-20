@@ -4,54 +4,12 @@ import { prisma } from "@/lib/db";
 import { checkRateLimit, hashIp } from "@/lib/rate-limit";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { validateHuggingFaceModel, validateGgufUrl } from "@/lib/huggingface";
-import { submissionstatus } from "@/generated/prisma/client";
-
-// Allowed vLLM parameters (whitelist for security)
-// Only engine params are allowed - generation params are controlled server-side
-const ALLOWED_VLLM_ENGINE_PARAMS = new Set([
-  "gpu_memory_utilization",
-  "max_model_len",
-  "dtype",
-  "quantization",
-  "tokenizer",
-  "tokenizer_mode",
-  "enforce_eager",
-  "enable_prefix_caching",
-  "max_concurrent",
-  "ENV_VARS",
-]);
-
-// Allowed environment variables
-const ALLOWED_ENV_VARS = new Set([
-  "VLLM_ATTENTION_BACKEND",
-  "VLLM_USE_TRITON_FLASH_ATTN",
-  "VLLM_USE_V1",
-  "VLLM_DISABLE_FLASHINFER",
-  "VLLM_USE_FLASHINFER_SAMPLER",
-  "VLLM_USE_TRTLLM_ATTENTION",
-]);
-
-// Valid values for environment variables
-const ENV_VAR_VALID_VALUES: Record<string, Set<string>> = {
-  VLLM_ATTENTION_BACKEND: new Set(["FLASH_ATTN", "XFORMERS", "FLASHINFER", "TRITON_MLA"]),
-  VLLM_USE_TRITON_FLASH_ATTN: new Set(["0", "1"]),
-  VLLM_USE_V1: new Set(["0", "1"]),
-  VLLM_DISABLE_FLASHINFER: new Set(["0", "1"]),
-  VLLM_USE_FLASHINFER_SAMPLER: new Set(["0", "1"]),
-  VLLM_USE_TRTLLM_ATTENTION: new Set(["0", "1"]),
-};
-
-// Allowed quantization methods (vLLM 0.11.0)
-const ALLOWED_QUANTIZATION_METHODS = new Set([
-  "awq",
-  "gptq",
-  "marlin",
-  "int8",
-  "fp8",
-  "bitblas",
-  "bitsandbytes",
-  "gguf",
-]);
+import { submissionstatus, Prisma } from "@/generated/prisma/client";
+import {
+  validateAndSanitizeVllmParams,
+  type VllmParams,
+} from "@/lib/vllm-params-configurable-schema";
+import { mergeWithRequiredParams } from "@/lib/vllm-params-required-schema";
 
 // Judge models for evaluation
 const JUDGE_MODELS = [
@@ -60,138 +18,12 @@ const JUDGE_MODELS = [
   //"kimi-k2-0905",
 ];
 
-interface VllmEnvVars {
-  VLLM_ATTENTION_BACKEND?: string;
-  VLLM_USE_TRITON_FLASH_ATTN?: string;
-  VLLM_USE_V1?: string;
-  VLLM_DISABLE_FLASHINFER?: string;
-  VLLM_USE_FLASHINFER_SAMPLER?: string;
-  VLLM_USE_TRTLLM_ATTENTION?: string;
-  [key: string]: string | undefined;
-}
-
-interface VllmParams {
-  gpu_memory_utilization?: number;
-  max_model_len?: number;
-  dtype?: string;
-  quantization?: string;
-  tokenizer?: string;
-  tokenizer_mode?: string;
-  enforce_eager?: boolean;
-  enable_prefix_caching?: boolean;
-  max_concurrent?: number;
-  ENV_VARS?: VllmEnvVars;
-  [key: string]: string | number | boolean | VllmEnvVars | undefined;
-}
-
 interface SubmissionRequest {
   modelType: "huggingface" | "gguf";
   modelId?: string; // For HuggingFace models
   ggufUrl?: string; // For GGUF models
   vllmParams?: VllmParams;
   turnstileToken: string;
-}
-
-function validateAndSanitizeVllmParams(params: VllmParams | undefined): VllmParams {
-  if (!params) return {};
-
-  const sanitized: VllmParams = {};
-
-  // Only allow whitelisted engine params - reject any generation params or unknown keys
-  for (const key of Object.keys(params)) {
-    if (!ALLOWED_VLLM_ENGINE_PARAMS.has(key)) {
-      // Silently ignore disallowed params (could also throw an error)
-      continue;
-    }
-  }
-
-  // Validate gpu_memory_utilization
-  if (params.gpu_memory_utilization !== undefined) {
-    const val = Number(params.gpu_memory_utilization);
-    if (!isNaN(val) && val >= 0.1 && val <= 1.0) {
-      sanitized.gpu_memory_utilization = val;
-    }
-  }
-
-  // Validate max_model_len (16k-64k range)
-  if (params.max_model_len !== undefined) {
-    const val = Number(params.max_model_len);
-    if (Number.isInteger(val) && val >= 16384 && val <= 65536) {
-      sanitized.max_model_len = val;
-    }
-  }
-
-  // Validate dtype
-  if (params.dtype !== undefined) {
-    const allowed = ["auto", "float16", "bfloat16", "float32"];
-    if (allowed.includes(params.dtype)) {
-      sanitized.dtype = params.dtype;
-    }
-  }
-
-  // Validate quantization (vLLM 0.11.0 supported methods)
-  if (params.quantization !== undefined) {
-    if (ALLOWED_QUANTIZATION_METHODS.has(params.quantization)) {
-      sanitized.quantization = params.quantization;
-    }
-  }
-
-  // Validate tokenizer (basic string validation - must look like a HF model ID)
-  if (params.tokenizer !== undefined && typeof params.tokenizer === "string") {
-    const tokenizer = params.tokenizer.trim();
-    // Must contain a slash (org/model format) and only allowed characters
-    if (tokenizer && /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/.test(tokenizer)) {
-      sanitized.tokenizer = tokenizer;
-    }
-  }
-
-  // Validate tokenizer_mode
-  if (params.tokenizer_mode !== undefined) {
-    const allowed = ["auto", "slow", "mistral"];
-    if (allowed.includes(params.tokenizer_mode)) {
-      sanitized.tokenizer_mode = params.tokenizer_mode;
-    }
-  }
-
-  // Validate enforce_eager (boolean)
-  if (params.enforce_eager !== undefined) {
-    if (typeof params.enforce_eager === "boolean") {
-      sanitized.enforce_eager = params.enforce_eager;
-    }
-  }
-
-  // Validate enable_prefix_caching (boolean)
-  if (params.enable_prefix_caching !== undefined) {
-    if (typeof params.enable_prefix_caching === "boolean") {
-      sanitized.enable_prefix_caching = params.enable_prefix_caching;
-    }
-  }
-
-  // Validate max_concurrent
-  if (params.max_concurrent !== undefined) {
-    const val = Number(params.max_concurrent);
-    if (Number.isInteger(val) && val >= 1 && val <= 256) {
-      sanitized.max_concurrent = val;
-    }
-  }
-
-  // Validate ENV_VARS
-  if (params.ENV_VARS !== undefined && typeof params.ENV_VARS === "object") {
-    const sanitizedEnvVars: VllmEnvVars = {};
-    for (const [key, value] of Object.entries(params.ENV_VARS)) {
-      if (ALLOWED_ENV_VARS.has(key) && typeof value === "string") {
-        const validValues = ENV_VAR_VALID_VALUES[key];
-        if (validValues && validValues.has(value)) {
-          sanitizedEnvVars[key] = value;
-        }
-      }
-    }
-    if (Object.keys(sanitizedEnvVars).length > 0) {
-      sanitized.ENV_VARS = sanitizedEnvVars;
-    }
-  }
-
-  return sanitized;
 }
 
 function generateSubmissionId(): string {
@@ -283,23 +115,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate and sanitize vLLM params
-    const vllmParams = validateAndSanitizeVllmParams(body.vllmParams);
+    // Validate and sanitize user-configurable vLLM params, then merge with required params
+    const userVllmParams = validateAndSanitizeVllmParams(body.vllmParams);
+    const vllmParams = mergeWithRequiredParams(userVllmParams);
 
     // Validate model based on type
     let modelIdentifier: string;
-    const params: {
-      modelType: string;
-      modelId?: string;
-      ggufUrl?: string;
-      modelInfo?: object;
-      vllmParams?: VllmParams;
-      judges: string[];
-    } = {
+    // Build params object for Prisma JSON field
+    const params = {
       modelType: body.modelType,
       vllmParams: Object.keys(vllmParams).length > 0 ? vllmParams : undefined,
       judges: JUDGE_MODELS,
-    };
+    } as Record<string, unknown>;
 
     if (body.modelType === "huggingface") {
       if (!body.modelId) {
@@ -394,7 +221,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         created_ip: ipHash,
         status: submissionstatus.SUBMITTED,
-        params: params,
+        params: params as Prisma.InputJsonValue,
         priority_score: 0,
         attempts: 0,
         max_runtime_sec: 10800, // 3 hours default
