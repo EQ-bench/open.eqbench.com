@@ -137,7 +137,7 @@ function getStatusDescription(status: SubmissionStatus): string {
     case "STARTING":
       return "The evaluation environment is being prepared.";
     case "RUNNING":
-      return "Your model is currently being evaluated. This may take 1-3 hours.";
+      return "Your model is currently being evaluated. This may take up to 2 hours.";
     case "SUCCEEDED":
       return "Evaluation completed successfully! Results are now on the leaderboard.";
     case "FAILED":
