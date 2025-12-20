@@ -151,34 +151,6 @@ function getStatusDescription(status: SubmissionStatus): string {
   }
 }
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return "-";
-  const date = new Date(dateStr);
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).format(date);
-}
-
-function formatDuration(startStr: string | null, endStr: string | null): string {
-  if (!startStr) return "-";
-  const start = new Date(startStr);
-  const end = endStr ? new Date(endStr) : new Date();
-  const durationMs = end.getTime() - start.getTime();
-  const minutes = Math.floor(durationMs / 60000);
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-
-  if (hours > 0) {
-    return `${hours}h ${remainingMinutes}m`;
-  }
-  return `${minutes}m`;
-}
-
 export function SubmissionDetails({ initialSubmission, initialRunInfo }: SubmissionDetailsProps) {
   const [submission, setSubmission] = useState(initialSubmission);
   const [runInfo, setRunInfo] = useState(initialRunInfo);
@@ -374,7 +346,9 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
                       <Progress
                         value={eloComplete
                           ? 100
-                          : ((judgingProgress.elo.current_stage - 1) / judgingProgress.elo.total_stages) * 100
+                          : judgingProgress.elo.total_stages > 0
+                            ? ((judgingProgress.elo.current_stage - 1) / judgingProgress.elo.total_stages) * 100
+                            : 0
                         }
                         className={`h-2 ${eloComplete ? '[&>div]:bg-green-500' : ''} ${!eloComplete ? '[&>div]:animate-pulse' : ''}`}
                       />
@@ -439,57 +413,6 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
                   <code className="bg-muted px-2 py-1 rounded text-sm break-all">
                     {submissionParams.ggufUrl}
                   </code>
-                </dd>
-              </div>
-            )}
-          </dl>
-        </CardContent>
-      </Card>
-
-      {/* Timeline Card */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="space-y-4">
-            <div className="flex justify-between">
-              <dt className="text-sm font-medium text-muted-foreground">
-                Submitted
-              </dt>
-              <dd className="text-sm">{formatDate(submission.created_at)}</dd>
-            </div>
-
-            {submission.started_at && (
-              <div className="flex justify-between">
-                <dt className="text-sm font-medium text-muted-foreground">
-                  Started
-                </dt>
-                <dd className="text-sm">{formatDate(submission.started_at)}</dd>
-              </div>
-            )}
-
-            {submission.finished_at && (
-              <div className="flex justify-between">
-                <dt className="text-sm font-medium text-muted-foreground">
-                  Finished
-                </dt>
-                <dd className="text-sm">
-                  {formatDate(submission.finished_at)}
-                </dd>
-              </div>
-            )}
-
-            {submission.started_at && (
-              <div className="flex justify-between">
-                <dt className="text-sm font-medium text-muted-foreground">
-                  Duration
-                </dt>
-                <dd className="text-sm">
-                  {formatDuration(
-                    submission.started_at,
-                    submission.finished_at
-                  )}
                 </dd>
               </div>
             )}
