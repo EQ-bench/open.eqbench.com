@@ -20,7 +20,6 @@ export function SubmissionLogs({ submissionId, initialStatus }: SubmissionLogsPr
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [status, setStatus] = useState(initialStatus);
-  const logsEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const isInProgress = ["SUBMITTED", "QUEUED", "STARTING", "RUNNING"].includes(status);
@@ -57,10 +56,10 @@ export function SubmissionLogs({ submissionId, initialStatus }: SubmissionLogsPr
     return () => clearInterval(interval);
   }, [isInProgress, fetchLogs]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll logs container to bottom (not the page)
   useEffect(() => {
-    if (autoScroll && logsEndRef.current && containerRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    if (autoScroll && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
 
@@ -130,7 +129,6 @@ export function SubmissionLogs({ submissionId, initialStatus }: SubmissionLogsPr
               </div>
             ))
           )}
-          <div ref={logsEndRef} />
         </div>
         {isInProgress && (
           <p className="text-xs text-muted-foreground mt-2">
