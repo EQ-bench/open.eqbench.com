@@ -206,13 +206,7 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
             </div>
           </div>
         </CardHeader>
-        {isInProgress && (
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              This page automatically updates every 5 seconds.
-            </p>
-          </CardContent>
-        )}
+
       </Card>
 
       {/* Model Details Card */}

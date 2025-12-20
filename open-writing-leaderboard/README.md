@@ -6,6 +6,7 @@ A Next.js web app displaying creative writing benchmark results for language mod
 
 ```bash
 # Install dependencies
+cd open-writing-leaderboard
 npm install
 
 # Set up database connection
@@ -72,6 +73,7 @@ Schema is defined in the `open-writing-bench` repo. This app only reads; never p
 When the upstream schema changes:
 
 ```bash
+cd open-writing-leaderboard
 npx prisma db pull   # Introspect from live database
 npx prisma generate  # Regenerate client types
 ```
@@ -151,6 +153,7 @@ DATABASE_URL="postgresql://user:pass@host.neon.tech/dbname?sslmode=require"
 ## Development
 
 ```bash
+cd open-writing-leaderboard
 npm run dev      # Start dev server (http://localhost:3000)
 npm run build    # Production build
 npm run start    # Run production build

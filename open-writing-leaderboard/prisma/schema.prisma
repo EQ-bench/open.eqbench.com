@@ -75,16 +75,18 @@ model run_logs {
 }
 
 model runs {
-  run_key         String            @id @db.VarChar
-  test_model      String            @db.VarChar
-  start_time      DateTime?         @default(now()) @db.Timestamptz(6)
-  end_time        DateTime?         @db.Timestamptz(6)
-  status          String            @db.VarChar
-  run_config      Json              @db.Json
-  results         Json?             @db.Json
-  elo_comparisons elo_comparisons[]
-  run_logs        run_logs[]
-  tasks           tasks[]
+  run_key             String            @id @db.VarChar
+  test_model          String            @db.VarChar
+  start_time          DateTime?         @default(now()) @db.Timestamptz(6)
+  end_time            DateTime?         @db.Timestamptz(6)
+  status              String            @db.VarChar
+  run_config          Json              @db.Json
+  results             Json?             @db.Json
+  generation_progress Json?             @db.Json
+  judging_progress    Json?             @db.Json
+  elo_comparisons     elo_comparisons[]
+  run_logs            run_logs[]
+  tasks               tasks[]
 
   @@index([status], map: "ix_runs_status")
 }
