@@ -32,7 +32,7 @@ export default function RootLayout({
             <PaletteProvider>
               <div className="min-h-screen bg-background">
                 <Header />
-                <main className="container mx-auto px-4 py-8">
+                <main className="mx-auto max-w-7xl px-0 sm:px-4 py-8">
                   {children}
                 </main>
               </div>
