@@ -22,7 +22,7 @@ const VLLM_ERROR_PATTERNS: ErrorPattern[] = [
     category: "VRAM Error",
     getMessage: (match) =>
       `Not enough free GPU memory at startup. Available: ${match[1]}, Required: ${match[3]}`,
-    suggestion: "Try reducing gpu_memory_utilization or wait for other GPU processes to complete.",
+    suggestion: "Try reducing gpu_memory_utilization.",
   },
   {
     // Using [\s\S]*? instead of .*? with /s flag for cross-line matching

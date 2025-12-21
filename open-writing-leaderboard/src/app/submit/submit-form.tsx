@@ -20,7 +20,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Loader2, AlertCircle, CheckCircle2, Settings, Lightbulb } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Settings, Lightbulb, ArrowRight, Server, Wrench, Clock } from "lucide-react";
 import {
   vllmConfigurableSchema,
   getDefaultFormState,
@@ -42,10 +42,77 @@ interface SubmissionResponse {
 
 const selectClassName = "flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
+function SubmissionCoverPage({ onContinue }: { onContinue: () => void }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-2xl">Submitting to the Open Writing Leaderboard</CardTitle>
+        <CardDescription>
+          Please review these requirements before submitting
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Model Requirements */}
+        <div className="space-y-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Server className="h-4 w-4" />
+            Model Requirements
+          </h3>
+          <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
+            <li><strong>Public models only</strong> — gated models are not supported</li>
+            <li><strong>Safetensors format</strong> required (no GGUF support yet)</li>
+            <li><strong>trust_remote_code</strong> is disabled (whitelisted major labs only)</li>
+          </ul>
+        </div>
+
+        {/* Hardware */}
+        <div className="space-y-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Wrench className="h-4 w-4" />
+            Hardware & Backend
+          </h3>
+          <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
+            <li><strong>2× 80GB H100s</strong> — please don&apos;t submit models that won&apos;t fit</li>
+            <li>Models are loaded with <strong>vLLM</strong></li>
+          </ul>
+        </div>
+
+        {/* Troubleshooting */}
+        <div className="space-y-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Wrench className="h-4 w-4" />
+            Troubleshooting
+          </h3>
+          <p className="text-sm text-muted-foreground ml-6">
+            <strong>You are responsible for troubleshooting failed jobs.</strong> We provide output/error logs, an AI troubleshooter, and configurable vLLM parameters.
+          </p>
+        </div>
+
+        {/* Rate Limits */}
+        <div className="space-y-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Rate Limits
+          </h3>
+          <p className="text-sm text-muted-foreground ml-6">
+            ~3-5 successful submissions per day. Queue priority is based on usage.
+          </p>
+        </div>
+
+        <Button onClick={onContinue} className="w-full">
+          Continue to Submission
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SubmitForm() {
   const router = useRouter();
   const turnstileRef = useRef<TurnstileInstance>(null);
 
+  const [showCoverPage, setShowCoverPage] = useState(true);
   const [modelType] = useState<ModelType>("huggingface");
   const [modelId, setModelId] = useState("");
   const [formState, setFormState] = useState<VllmFormState>(getDefaultFormState());
@@ -292,6 +359,10 @@ export function SubmitForm() {
 
   const envVarKeys = Object.keys(vllmConfigurableSchema.envVars) as ConfigurableEnvVarKey[];
 
+  if (showCoverPage) {
+    return <SubmissionCoverPage onContinue={() => setShowCoverPage(false)} />;
+  }
+
   return (
     <form onSubmit={handleSubmit}>
       <Card>
@@ -427,31 +498,6 @@ export function SubmitForm() {
               "Submit for Evaluation"
             )}
           </Button>
-        </CardContent>
-      </Card>
-
-      {/* Info Card */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="text-base">Submission Guidelines</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>
-            <strong>Rate Limits:</strong> You can submit up to 3 models per 24
-            hours.
-          </p>
-          <p>
-            <strong>Evaluation Time:</strong> Each model typically takes 1-3
-            hours to evaluate depending on queue length.
-          </p>
-          <p>
-            <strong>Requirements:</strong> Models must be publicly accessible on
-            Hugging Face. Private or gated models are not supported.
-          </p>
-          <p>
-            <strong>Results:</strong> Once evaluation completes, results will
-            appear on the leaderboard automatically.
-          </p>
         </CardContent>
       </Card>
     </form>
