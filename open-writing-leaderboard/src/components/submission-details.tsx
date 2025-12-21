@@ -27,6 +27,7 @@ import {
 } from "@/lib/vllm-params-configurable-schema";
 import { vllmRequiredParams } from "@/lib/vllm-params-required-schema";
 import { extractErrors, extractErrorsFromLogs, type ExtractedError } from "@/lib/extract-errors";
+import { ErrorHelpWizard } from "@/components/error-help-wizard";
 
 type SubmissionStatus = "SUBMITTED" | "QUEUED" | "STARTING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMEOUT" | "CANCELLED";
 
@@ -741,6 +742,11 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
+
+              {/* AI Help Wizard */}
+              <div className="border-t pt-4">
+                <ErrorHelpWizard submissionId={submission.id} />
+              </div>
             </CardContent>
           </Card>
         );

@@ -61,7 +61,7 @@ function SubmissionCoverPage({ onContinue }: { onContinue: () => void }) {
           <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
             <li><strong>Public models only</strong> — gated models are not supported</li>
             <li><strong>Safetensors format</strong> required (no GGUF support yet)</li>
-            <li><strong>trust_remote_code</strong> is disabled (whitelisted major labs only)</li>
+            <li><strong>trust_remote_code</strong> is disabled by default (major labs are whitelisted)</li>
           </ul>
         </div>
 
@@ -73,7 +73,7 @@ function SubmissionCoverPage({ onContinue }: { onContinue: () => void }) {
           </h3>
           <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
             <li><strong>2× 80GB H100s</strong> — please don&apos;t submit models that won&apos;t fit</li>
-            <li>Models are loaded with <strong>vLLM</strong></li>
+            <li>Models are loaded with <strong>vLLM 0.13.0</strong></li>
           </ul>
         </div>
 
