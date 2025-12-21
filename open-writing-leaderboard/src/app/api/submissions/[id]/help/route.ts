@@ -134,6 +134,9 @@ ${envVarsDocs}
 4. If the error is not fixable via configuration (e.g., gated model, model doesn't exist), explain that clearly
 5. Be concise but thorough - users want actionable advice
 
+## Response Format
+This is a one-off request — there is no back-and-forth conversation. The user cannot respond or ask follow-up questions. Your response must be complete and self-contained. Do not ask clarifying questions or say things like "let me know if you need more help."
+
 Do not suggest settings that aren't in the configurable options list above.`;
 }
 
