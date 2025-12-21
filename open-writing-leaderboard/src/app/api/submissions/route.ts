@@ -141,8 +141,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: validation.error }, { status: 400 });
       }
 
-      modelIdentifier = body.modelId;
-      params.modelId = body.modelId;
+      const normalizedModelId = validation.normalizedModelId!;
+      modelIdentifier = normalizedModelId;
+      params.modelId = normalizedModelId;
       params.modelInfo = validation.modelInfo;
     } else if (body.modelType === "gguf") {
       if (!body.ggufUrl) {

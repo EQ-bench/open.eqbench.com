@@ -42,7 +42,8 @@ interface SampleResponse {
 interface JudgeResult {
   judge_model_name: string;
   judge_order_index: number;
-  judge_scores: Record<string, number> | null;
+  judge_scores: Record<string, number | string> | null;
+  raw_judge_text: string | null;
 }
 
 interface MatchupSummary {
@@ -571,7 +572,21 @@ const EXCLUDED_SCORE_FIELDS = new Set([
   "per metric",
   "n judges",
   "ensemble mode",
+  "analysis_text",
 ]);
+
+// Parse analysis text from raw_judge_text (fallback when analysis_text key is missing)
+function parseAnalysisFromRawText(rawText: string | null): string | null {
+  if (!rawText) return null;
+
+  // Look for [Analysis] section
+  const analysisMatch = rawText.match(/\[Analysis\]\s*([\s\S]*?)(?=\[Scores\]|$)/i);
+  if (analysisMatch && analysisMatch[1]) {
+    return analysisMatch[1].trim();
+  }
+
+  return null;
+}
 
 function JudgeScoresSection({
   loadedJudges,
@@ -601,6 +616,10 @@ function JudgeScoresSection({
         )
         .sort(([a], [b]) => a.localeCompare(b))
     : [];
+
+  // Get analysis text - prefer analysis_text from judge_scores, fallback to parsing raw_judge_text
+  const analysisText = selectedJudge?.judge_scores?.analysis_text as string | undefined
+    ?? parseAnalysisFromRawText(selectedJudge?.raw_judge_text ?? null);
 
   // Scale score from 0-20 to 0-100
   const scaleScore = (score: number) => score * 5;
@@ -692,6 +711,20 @@ function JudgeScoresSection({
               );
             })}
           </div>
+
+          {/* Analysis text */}
+          {analysisText && (
+            <div className="pt-2 border-t">
+              <div className="text-xs font-medium text-muted-foreground mb-2">
+                ANALYSIS
+              </div>
+              <div className="bg-muted/30 rounded p-3">
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                  {analysisText}
+                </pre>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1037,11 +1070,11 @@ function JudgeResponsesDisplay({
               }
               return (
                 <div>
-                  <div className="text-xs font-medium uppercase text-muted-foreground mb-1">
+                  <div className="text-xs font-medium uppercase text-muted-foreground mb-2">
                     Reasoning
                   </div>
-                  <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2">
-                    <pre className="whitespace-pre-wrap font-sans">
+                  <div className="bg-muted/30 rounded p-3">
+                    <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
                       {reasoningText}
                     </pre>
                   </div>

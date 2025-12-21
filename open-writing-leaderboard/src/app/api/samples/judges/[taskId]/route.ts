@@ -18,6 +18,7 @@ export async function GET(
       judge_model_name: true,
       judge_order_index: true,
       judge_scores: true,
+      raw_judge_text: true,
     },
     orderBy: { judge_order_index: "asc" },
   });

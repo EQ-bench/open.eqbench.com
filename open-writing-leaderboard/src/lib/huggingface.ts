@@ -18,6 +18,7 @@ export interface ModelValidationResult {
   valid: boolean;
   error?: string;
   modelInfo?: HFModelInfo;
+  normalizedModelId?: string;
 }
 
 /**
@@ -30,6 +31,9 @@ export async function validateHuggingFaceModel(
   if (!modelId || typeof modelId !== "string") {
     return { valid: false, error: "Model ID is required" };
   }
+
+  // Trim whitespace
+  modelId = modelId.trim();
 
   // Model ID should be in format "owner/model-name" or just "model-name" for official models
   const modelIdPattern = /^[\w.-]+(?:\/[\w.-]+)?$/;
@@ -84,6 +88,7 @@ export async function validateHuggingFaceModel(
     return {
       valid: true,
       modelInfo,
+      normalizedModelId: modelId,
     };
   } catch (error) {
     console.error("HuggingFace API error:", error);
