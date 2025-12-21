@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +26,7 @@ export default async function SubmissionPage({ params }: SubmissionPageProps) {
     where: { id },
     select: {
       id: true,
+      user_id: true,
       status: true,
       params: true,
       created_at: true,
@@ -37,6 +39,17 @@ export default async function SubmissionPage({ params }: SubmissionPageProps) {
 
   if (!submission) {
     notFound();
+  }
+
+  // Check if current user is the owner
+  let isOwner = false;
+  const session = await auth();
+  if (session?.user?.id) {
+    const user = await prisma.users.findUnique({
+      where: { auth_subject: session.user.id },
+      select: { id: true },
+    });
+    isOwner = user?.id === submission.user_id;
   }
 
   // Fetch run info if available
@@ -116,6 +129,7 @@ export default async function SubmissionPage({ params }: SubmissionPageProps) {
       <SubmissionDetails
         initialSubmission={serializedSubmission}
         initialRunInfo={serializedRunInfo}
+        isOwner={isOwner}
       />
 
       {/* Run Logs */}

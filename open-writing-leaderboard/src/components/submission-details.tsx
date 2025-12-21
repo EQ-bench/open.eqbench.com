@@ -17,7 +17,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Clock, CheckCircle2, XCircle, Loader2, Sparkles, Scale, Settings2, AlertTriangle, Lightbulb } from "lucide-react";
+import { ExternalLink, Clock, CheckCircle2, XCircle, Loader2, Sparkles, Scale, Settings2, AlertTriangle, Lightbulb, Ban } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
   vllmParamsSchema,
@@ -86,6 +86,7 @@ interface RunInfo {
 interface SubmissionDetailsProps {
   initialSubmission: SubmissionData;
   initialRunInfo: RunInfo | null;
+  isOwner?: boolean;
 }
 
 function getStatusIcon(status: SubmissionStatus) {
@@ -274,13 +275,16 @@ interface LogEntry {
   data: string;
 }
 
-export function SubmissionDetails({ initialSubmission, initialRunInfo }: SubmissionDetailsProps) {
+export function SubmissionDetails({ initialSubmission, initialRunInfo, isOwner = false }: SubmissionDetailsProps) {
   const [submission, setSubmission] = useState(initialSubmission);
   const [runInfo, setRunInfo] = useState(initialRunInfo);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const isInProgress = ["SUBMITTED", "QUEUED", "STARTING", "RUNNING"].includes(submission.status);
   const isFailedStatus = ["FAILED", "TIMEOUT", "CANCELLED"].includes(submission.status);
+  const canCancel = isOwner && submission.status === "SUBMITTED";
 
   const fetchSubmission = useCallback(async () => {
     try {
@@ -313,6 +317,34 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
       console.error("Failed to fetch logs:", error);
     }
   }, [submission.id]);
+
+  // Cancel submission handler
+  const handleCancel = useCallback(async () => {
+    if (!canCancel || isCancelling) return;
+
+    setIsCancelling(true);
+    setCancelError(null);
+
+    try {
+      const response = await fetch(`/api/submissions/${submission.id}/cancel`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setCancelError(data.error || "Failed to cancel submission");
+        return;
+      }
+
+      // Update local state
+      setSubmission((prev) => ({ ...prev, status: "CANCELLED" as SubmissionStatus }));
+    } catch (error) {
+      console.error("Failed to cancel submission:", error);
+      setCancelError("Failed to cancel submission");
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [submission.id, canCancel, isCancelling]);
 
   // Auto-refresh when in progress
   useEffect(() => {
@@ -362,9 +394,27 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
                 </CardDescription>
               </div>
             </div>
+            {canCancel && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                {isCancelling ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Ban className="h-4 w-4 mr-2" />
+                )}
+                Cancel
+              </Button>
+            )}
           </div>
+          {cancelError && (
+            <p className="text-sm text-destructive mt-2">{cancelError}</p>
+          )}
         </CardHeader>
-
       </Card>
 
       {/* Progress Card - show when we have progress data */}
