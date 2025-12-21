@@ -10,9 +10,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Clock, CheckCircle2, XCircle, Loader2, Sparkles, Scale } from "lucide-react";
+import { ExternalLink, Clock, CheckCircle2, XCircle, Loader2, Sparkles, Scale, Settings2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import {
+  vllmParamsSchema,
+  type VllmParams,
+  type VllmArg,
+  type ConfigurableEngineParamKey,
+} from "@/lib/vllm-params-configurable-schema";
 
 type SubmissionStatus = "SUBMITTED" | "QUEUED" | "STARTING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMEOUT" | "CANCELLED";
 
@@ -23,6 +35,7 @@ interface SubmissionData {
     modelType?: string;
     modelId?: string;
     ggufUrl?: string;
+    vllmParams?: VllmParams;
   } | null;
   created_at: string;
   started_at: string | null;
@@ -151,6 +164,106 @@ function getStatusDescription(status: SubmissionStatus): string {
   }
 }
 
+// Get label for an arg from the schema
+function getArgLabel(arg: string): string {
+  for (const [, config] of Object.entries(vllmParamsSchema.engineParams)) {
+    if (config.arg === arg) {
+      return config.label;
+    }
+  }
+  // Fallback: convert --kebab-case to Title Case
+  return arg.replace(/^--/, "").replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Format arg value for display
+function formatArgValue(arg: string, value: string | number | null): string {
+  if (value === null) {
+    return "Enabled";
+  }
+
+  // For select types, try to get the option label
+  for (const [, config] of Object.entries(vllmParamsSchema.engineParams)) {
+    if (config.arg === arg && config.type === "select") {
+      const option = config.options.find(opt => opt.value === value);
+      if (option) {
+        return option.label;
+      }
+    }
+  }
+
+  return String(value);
+}
+
+// Get label for env var from schema
+function getEnvVarLabel(key: string): string {
+  const schema = vllmParamsSchema.envVars;
+  if (key in schema) {
+    return (schema as Record<string, { label?: string }>)[key]?.label || key;
+  }
+  return key;
+}
+
+// Format env var value for display
+function formatEnvVarValue(key: string, value: string): string {
+  const schema = vllmParamsSchema.envVars;
+  if (key in schema) {
+    const config = (schema as Record<string, { options?: readonly { value: string | null; label: string }[] }>)[key];
+    if (config?.options) {
+      const option = config.options.find(opt => opt.value === value);
+      if (option) {
+        return option.label;
+      }
+    }
+  }
+  return value;
+}
+
+// Legacy key mapping for old submissions
+const legacyKeyMapping: Record<string, ConfigurableEngineParamKey> = {
+  gpu_memory_utilization: "gpu-memory-utilization",
+  max_model_len: "max-model-len",
+  dtype: "dtype",
+  quantization: "quantization",
+  kv_cache_dtype: "kv-cache-dtype",
+  tokenizer: "tokenizer",
+  tokenizer_mode: "tokenizer-mode",
+  enforce_eager: "enforce-eager",
+  enable_prefix_caching: "enable-prefix-caching",
+  max_num_seqs: "max-num-seqs",
+  max_num_batched_tokens: "max-num-batched-tokens",
+  max_parallel_loading_workers: "max-parallel-loading-workers",
+  enable_expert_parallel: "enable-expert-parallel",
+  disable_custom_all_reduce: "disable-custom-all-reduce",
+};
+
+function getLegacyParamLabel(key: string): string {
+  const newKey = legacyKeyMapping[key];
+  if (newKey && newKey in vllmParamsSchema.engineParams) {
+    return vllmParamsSchema.engineParams[newKey].label;
+  }
+  // Fallback
+  return key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatLegacyParamValue(key: string, value: unknown): string {
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  const newKey = legacyKeyMapping[key];
+  if (newKey && newKey in vllmParamsSchema.engineParams) {
+    const config = vllmParamsSchema.engineParams[newKey];
+    if (config.type === "select") {
+      const option = config.options.find(opt => opt.value === value);
+      if (option) {
+        return option.label;
+      }
+    }
+  }
+
+  return String(value);
+}
+
 export function SubmissionDetails({ initialSubmission, initialRunInfo }: SubmissionDetailsProps) {
   const [submission, setSubmission] = useState(initialSubmission);
   const [runInfo, setRunInfo] = useState(initialRunInfo);
@@ -183,6 +296,11 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
   }, [isInProgress, fetchSubmission]);
 
   const submissionParams = submission.params;
+  const vllmParams = submissionParams?.vllmParams;
+
+  // Determine if we have new format (args array) or legacy format
+  const hasNewFormat = vllmParams?.args !== undefined;
+  const hasLegacyFormat = !hasNewFormat && vllmParams && Object.keys(vllmParams).some(k => k !== "ENV_VARS" && k !== "args" && k !== "envVars");
 
   return (
     <>
@@ -417,6 +535,96 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
               </div>
             )}
           </dl>
+
+          {/* Run Configuration - Expandable */}
+          {vllmParams && (hasNewFormat || hasLegacyFormat) && (
+            <Accordion type="single" collapsible className="mt-4">
+              <AccordionItem value="run-config" className="border rounded-lg">
+                <AccordionTrigger className="px-4 hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Run Configuration</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <dl className="space-y-3">
+                    {/* New format: args array */}
+                    {hasNewFormat && vllmParams.args && (vllmParams.args as VllmArg[]).map((item) => (
+                      <div key={item.arg} className="flex justify-between items-start gap-4">
+                        <dt className="text-sm text-muted-foreground">
+                          {getArgLabel(item.arg)}
+                        </dt>
+                        <dd className="text-sm font-mono text-right">
+                          {formatArgValue(item.arg, item.value)}
+                        </dd>
+                      </div>
+                    ))}
+
+                    {/* Legacy format: flat object */}
+                    {hasLegacyFormat && Object.entries(vllmParams)
+                      .filter(([key]) => key !== "ENV_VARS" && key !== "args" && key !== "envVars" && legacyKeyMapping[key])
+                      .map(([key, value]) => (
+                        <div key={key} className="flex justify-between items-start gap-4">
+                          <dt className="text-sm text-muted-foreground">
+                            {getLegacyParamLabel(key)}
+                          </dt>
+                          <dd className="text-sm font-mono text-right">
+                            {formatLegacyParamValue(key, value)}
+                          </dd>
+                        </div>
+                      ))}
+
+                    {/* Environment variables - new format */}
+                    {hasNewFormat && vllmParams.envVars &&
+                      Object.keys(vllmParams.envVars as Record<string, string>).length > 0 && (
+                        <>
+                          <div className="border-t pt-3 mt-3">
+                            <dt className="text-sm font-medium text-muted-foreground mb-2">
+                              Environment Variables
+                            </dt>
+                          </div>
+                          {Object.entries(vllmParams.envVars as Record<string, string>)
+                            .map(([key, value]) => (
+                              <div key={key} className="flex justify-between items-start gap-4">
+                                <dt className="text-sm text-muted-foreground">
+                                  {getEnvVarLabel(key)}
+                                </dt>
+                                <dd className="text-sm font-mono text-right">
+                                  {formatEnvVarValue(key, value)}
+                                </dd>
+                              </div>
+                            ))}
+                        </>
+                      )}
+
+                    {/* Environment variables - legacy format */}
+                    {hasLegacyFormat && vllmParams.ENV_VARS &&
+                      Object.keys(vllmParams.ENV_VARS).length > 0 && (
+                        <>
+                          <div className="border-t pt-3 mt-3">
+                            <dt className="text-sm font-medium text-muted-foreground mb-2">
+                              Environment Variables
+                            </dt>
+                          </div>
+                          {Object.entries(vllmParams.ENV_VARS)
+                            .filter(([, value]) => value !== undefined && value !== "")
+                            .map(([key, value]) => (
+                              <div key={key} className="flex justify-between items-start gap-4">
+                                <dt className="text-sm text-muted-foreground">
+                                  {getEnvVarLabel(key)}
+                                </dt>
+                                <dd className="text-sm font-mono text-right">
+                                  {formatEnvVarValue(key, value as string)}
+                                </dd>
+                              </div>
+                            ))}
+                        </>
+                      )}
+                  </dl>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          )}
         </CardContent>
       </Card>
 

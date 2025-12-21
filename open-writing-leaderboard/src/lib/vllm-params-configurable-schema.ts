@@ -1,45 +1,118 @@
 // JSON Schema definition for vLLM parameters
 // Used for UI generation, frontend validation, and backend validation
+//
+// Output format: { args: [{ arg: "--flag", value: null | string | number }], envVars: { KEY: "value" } }
+// - For presence-only flags (e.g. --enforce-eager): value is null
+// - For key-value args (e.g. --dtype auto): value is the value
+// - Args not in the list are not set (omitted from CLI)
+
+export interface VllmArg {
+  arg: string;
+  value: string | number | null;
+}
+
+export interface VllmArgsOutput {
+  args: VllmArg[];
+  envVars: Record<string, string>;
+}
+
+// Schema field types
+interface NumberField {
+  type: "number";
+  arg: string;
+  label: string;
+  description: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  placeholder?: string;
+  default: number | null; // null = not set
+}
+
+interface SelectField {
+  type: "select";
+  arg: string;
+  label: string;
+  description: string;
+  options: readonly { value: string | null; label: string }[];
+  default: string | null; // null = not set
+}
+
+interface TextField {
+  type: "text";
+  arg: string;
+  label: string;
+  description: string;
+  placeholder?: string;
+  default: null; // text fields default to not set
+}
+
+// Boolean type is for presence/absence flags like --enforce-eager
+// null = not set, true = include flag
+interface BooleanField {
+  type: "boolean";
+  arg: string;
+  label: string;
+  description: string;
+  default: boolean | null; // null = not set
+}
+
+// Env var select field (no arg, just key-value)
+interface EnvVarSelectField {
+  type: "select";
+  label: string;
+  description: string;
+  options: readonly { value: string | null; label: string }[];
+  default: string | null;
+}
+
+type EngineParamField = NumberField | SelectField | TextField | BooleanField;
+type EnvVarField = EnvVarSelectField;
 
 export const vllmParamsSchema = {
   engineParams: {
-    gpu_memory_utilization: {
+    "gpu-memory-utilization": {
       type: "number",
+      arg: "--gpu-memory-utilization",
       label: "GPU Memory Utilization",
-      description: "Fraction of GPU memory to use (0.1-1.0)",
+      description: "Fraction of GPU memory to use (0.5-0.98)",
       min: 0.5,
       max: 0.98,
-      step: 0.001,
+      step: 0.01,
       placeholder: "0.9",
       default: 0.92,
     },
-    max_model_len: {
+    "max-model-len": {
       type: "number",
+      arg: "--max-model-len",
       label: "Max Model Length",
       description: "Maximum context length for the model",
-      min: 16384,
-      max: 65536,
+      min: 1024,
+      max: 131072,
       step: 1,
       placeholder: "32768",
       default: 32768,
     },
-    dtype: {
+    "dtype": {
       type: "select",
+      arg: "--dtype",
       label: "Data Type",
       description: "Data type for model weights",
       options: [
+        { value: null, label: "Not Set" },
         { value: "auto", label: "Auto" },
         { value: "float16", label: "float16" },
         { value: "bfloat16", label: "bfloat16" },
       ],
-      default: "auto",
+      default: null,
     },
-    quantization: {
+    "quantization": {
       type: "select",
+      arg: "--quantization",
       label: "Quantization",
       description: "Quantization method",
       options: [
-        { value: "", label: "None" },
+        { value: null, label: "Not Set" },
         { value: "aqlm", label: "AQLM" },
         { value: "awq", label: "AWQ" },
         { value: "awq_marlin", label: "AWQ Marlin" },
@@ -59,180 +132,187 @@ export const vllmParamsSchema = {
         { value: "qqq", label: "QQQ" },
         { value: "tpu_int8", label: "TPU INT8" },
       ],
-      default: "",
+      default: null,
     },
-    kv_cache_dtype: {
+    "kv-cache-dtype": {
       type: "select",
+      arg: "--kv-cache-dtype",
       label: "KV Cache Data Type",
       description: "Data type for KV cache",
       options: [
+        { value: null, label: "Not Set" },
         { value: "auto", label: "Auto" },
         { value: "fp8", label: "FP8" },
         { value: "fp8_e4m3", label: "FP8 E4M3" },
         { value: "fp8_e5m2", label: "FP8 E5M2" },
       ],
-      default: "auto",
+      default: null,
     },
-    tokenizer: {
+    "tokenizer": {
       type: "text",
+      arg: "--tokenizer",
       label: "Custom Tokenizer",
       description: "Custom tokenizer to use (HuggingFace ID)",
       placeholder: "e.g., org/tokenizer-name",
+      default: null,
     },
-    tokenizer_mode: {
+    "tokenizer-mode": {
       type: "select",
+      arg: "--tokenizer-mode",
       label: "Tokenizer Mode",
       description: "Tokenizer mode",
       options: [
-        { value: "", label: "Default" },
+        { value: null, label: "Not Set" },
         { value: "auto", label: "Auto" },
         { value: "slow", label: "Slow" },
         { value: "mistral", label: "Mistral" },
       ],
-      default: "",
+      default: null,
     },
-    enforce_eager: {
+    "enforce-eager": {
       type: "boolean",
+      arg: "--enforce-eager",
       label: "Enforce Eager",
       description: "Disable CUDA graph optimization",
-      default: false,
+      default: null,
     },
-    enable_prefix_caching: {
+    "enable-prefix-caching": {
       type: "boolean",
+      arg: "--enable-prefix-caching",
       label: "Enable Prefix Caching",
       description: "Enable automatic prefix caching",
-      default: false,
+      default: null,
     },
-    max_concurrent: {
+    "max-num-seqs": {
       type: "number",
-      label: "Max Concurrent Requests",
-      description: "Maximum concurrent requests to process",
-      min: 1,
-      max: 256,
-      step: 1,
-      placeholder: "Default",
-    },
-    max_num_seqs: {
-      type: "number",
+      arg: "--max-num-seqs",
       label: "Max Number of Sequences",
       description: "Maximum number of sequences per iteration",
       min: 1,
       max: 1024,
       step: 1,
       placeholder: "Default",
+      default: null,
     },
-    max_num_batched_tokens: {
+    "max-num-batched-tokens": {
       type: "number",
+      arg: "--max-num-batched-tokens",
       label: "Max Batched Tokens",
       description: "Maximum number of batched tokens per iteration",
       min: 1,
       max: 131072,
       step: 1024,
       placeholder: "Default",
+      default: null,
     },
-    max_parallel_loading_workers: {
+    "max-parallel-loading-workers": {
       type: "number",
+      arg: "--max-parallel-loading-workers",
       label: "Max Parallel Loading Workers",
       description: "Number of workers for parallel model loading",
       min: 1,
       max: 32,
       step: 1,
       placeholder: "Default",
+      default: null,
     },
-    enable_expert_parallel: {
+    "enable-expert-parallel": {
       type: "boolean",
+      arg: "--enable-expert-parallel",
       label: "Enable Expert Parallel",
       description: "Enable expert parallelism for MoE models",
-      default: false,
+      default: null,
     },
-    disable_custom_all_reduce: {
+    "disable-custom-all-reduce": {
       type: "boolean",
+      arg: "--disable-custom-all-reduce",
       label: "Disable Custom All-Reduce",
       description: "Disable custom all-reduce kernel",
-      default: false,
+      default: null,
     },
-  },
+  } as const satisfies Record<string, EngineParamField>,
+
   envVars: {
     VLLM_ATTENTION_BACKEND: {
       type: "select",
       label: "Attention Backend",
       description: "Attention backend to use",
       options: [
-        { value: "", label: "Default" },
+        { value: null, label: "Not Set" },
         { value: "FLASH_ATTN", label: "Flash Attention" },
         { value: "XFORMERS", label: "xFormers" },
         { value: "FLASHINFER", label: "FlashInfer" },
         { value: "TRITON_MLA", label: "Triton MLA" },
       ],
-      default: "",
+      default: null,
     },
     VLLM_USE_V1: {
       type: "select",
       label: "Use V1 Engine",
       description: "Use V1 engine architecture",
       options: [
-        { value: "", label: "Default" },
+        { value: null, label: "Not Set" },
         { value: "1", label: "Enabled (1)" },
         { value: "0", label: "Disabled (0)" },
       ],
-      default: "",
+      default: null,
     },
     VLLM_USE_TRITON_FLASH_ATTN: {
       type: "select",
       label: "Triton Flash Attention",
       description: "Use Triton Flash Attention",
       options: [
-        { value: "", label: "Default" },
+        { value: null, label: "Not Set" },
         { value: "1", label: "Enabled (1)" },
         { value: "0", label: "Disabled (0)" },
       ],
-      default: "",
+      default: null,
     },
     VLLM_DISABLE_FLASHINFER: {
       type: "select",
       label: "Disable FlashInfer",
       description: "Disable FlashInfer backend",
       options: [
-        { value: "", label: "Default" },
+        { value: null, label: "Not Set" },
         { value: "1", label: "Disabled (1)" },
         { value: "0", label: "Enabled (0)" },
       ],
-      default: "",
+      default: null,
     },
     VLLM_USE_FLASHINFER_SAMPLER: {
       type: "select",
       label: "FlashInfer Sampler",
       description: "Use FlashInfer sampler",
       options: [
-        { value: "", label: "Default" },
+        { value: null, label: "Not Set" },
         { value: "1", label: "Enabled (1)" },
         { value: "0", label: "Disabled (0)" },
       ],
-      default: "",
+      default: null,
     },
     VLLM_USE_TRTLLM_ATTENTION: {
       type: "select",
       label: "TensorRT-LLM Attention",
       description: "Use TensorRT-LLM attention",
       options: [
-        { value: "", label: "Default" },
+        { value: null, label: "Not Set" },
         { value: "1", label: "Enabled (1)" },
         { value: "0", label: "Disabled (0)" },
       ],
-      default: "",
+      default: null,
     },
     VLLM_WORKER_MULTIPROC_METHOD: {
       type: "select",
       label: "Worker Multiproc Method",
       description: "Multiprocessing method for workers",
       options: [
-        { value: "", label: "Default" },
+        { value: null, label: "Not Set" },
         { value: "spawn", label: "Spawn" },
         { value: "fork", label: "Fork" },
       ],
-      default: "",
+      default: null,
     },
-  },
+  } as const satisfies Record<string, EnvVarField>,
 } as const;
 
 // Renamed export for clarity
@@ -246,6 +326,198 @@ export type ConfigurableEnvVarKey = keyof typeof vllmParamsSchema.envVars;
 export type EngineParamKey = ConfigurableEngineParamKey;
 export type EnvVarKey = ConfigurableEnvVarKey;
 
+// Form state types (what the UI works with)
+export interface VllmFormState {
+  engineParams: {
+    [K in ConfigurableEngineParamKey]?: string | number | boolean | null;
+  };
+  envVars: {
+    [K in ConfigurableEnvVarKey]?: string | null;
+  };
+}
+
+// Helper to get default form state
+export function getDefaultFormState(): VllmFormState {
+  const state: VllmFormState = {
+    engineParams: {},
+    envVars: {},
+  };
+
+  for (const [key, config] of Object.entries(vllmParamsSchema.engineParams)) {
+    if (config.default !== null) {
+      state.engineParams[key as ConfigurableEngineParamKey] = config.default;
+    }
+  }
+
+  for (const [key, config] of Object.entries(vllmParamsSchema.envVars)) {
+    if (config.default !== null) {
+      state.envVars[key as ConfigurableEnvVarKey] = config.default;
+    }
+  }
+
+  return state;
+}
+
+// Convert form state to output format for API
+export function formStateToArgsOutput(formState: VllmFormState): VllmArgsOutput {
+  const args: VllmArg[] = [];
+  const envVars: Record<string, string> = {};
+
+  // Process engine params
+  for (const [key, value] of Object.entries(formState.engineParams)) {
+    if (value === null || value === undefined || value === "") continue;
+
+    const config = vllmParamsSchema.engineParams[key as ConfigurableEngineParamKey];
+    if (!config) continue;
+
+    if (config.type === "boolean") {
+      // Boolean flags: only include if true
+      if (value === true) {
+        args.push({ arg: config.arg, value: null });
+      }
+    } else if (config.type === "number") {
+      // Number args: include with value
+      if (typeof value === "number" && !isNaN(value)) {
+        args.push({ arg: config.arg, value });
+      }
+    } else if (config.type === "select" || config.type === "text") {
+      // Select/text args: include with string value
+      if (typeof value === "string" && value !== "") {
+        args.push({ arg: config.arg, value });
+      }
+    }
+  }
+
+  // Process env vars
+  for (const [key, value] of Object.entries(formState.envVars)) {
+    if (value === null || value === undefined || value === "") continue;
+    envVars[key] = value;
+  }
+
+  return { args, envVars };
+}
+
+// Validation helpers
+export function getAllowedEngineParams(): Set<string> {
+  return new Set(Object.keys(vllmParamsSchema.engineParams));
+}
+
+export function getAllowedEnvVars(): Set<string> {
+  return new Set(Object.keys(vllmParamsSchema.envVars));
+}
+
+export function getEnvVarValidValues(): Record<string, Set<string>> {
+  const result: Record<string, Set<string>> = {};
+  for (const [key, config] of Object.entries(vllmParamsSchema.envVars)) {
+    const values: string[] = [];
+    for (const opt of config.options) {
+      if (opt.value !== null) {
+        values.push(opt.value);
+      }
+    }
+    result[key] = new Set(values);
+  }
+  return result;
+}
+
+export function getAllowedQuantizationMethods(): Set<string> {
+  const quantConfig = vllmParamsSchema.engineParams.quantization;
+  const values: string[] = [];
+  for (const opt of quantConfig.options) {
+    if (opt.value !== null) {
+      values.push(opt.value);
+    }
+  }
+  return new Set(values);
+}
+
+// Validation function for vLLM args output (from API submission)
+export function validateAndSanitizeVllmArgs(input: unknown): VllmArgsOutput {
+  const result: VllmArgsOutput = { args: [], envVars: {} };
+
+  if (!input || typeof input !== "object") return result;
+
+  const inputObj = input as Record<string, unknown>;
+
+  // Validate args array
+  if (Array.isArray(inputObj.args)) {
+    // Build a map from arg string to config
+    const argToConfig: Record<string, typeof vllmParamsSchema.engineParams[ConfigurableEngineParamKey]> = {};
+    for (const [, config] of Object.entries(vllmParamsSchema.engineParams)) {
+      argToConfig[config.arg] = config;
+    }
+
+    for (const item of inputObj.args) {
+      if (!item || typeof item !== "object") continue;
+      const argItem = item as Record<string, unknown>;
+
+      const arg = argItem.arg;
+      const value = argItem.value;
+
+      if (typeof arg !== "string") continue;
+
+      const config = argToConfig[arg];
+      if (!config) continue;
+
+      // Validate based on type
+      if (config.type === "boolean") {
+        // Boolean flags should have null value
+        if (value === null) {
+          result.args.push({ arg, value: null });
+        }
+      } else if (config.type === "number") {
+        if (typeof value === "number" && !isNaN(value)) {
+          let numVal = value;
+          if (config.min !== undefined && numVal < config.min) {
+            numVal = config.min;
+          }
+          if (config.max !== undefined && numVal > config.max) {
+            numVal = config.max;
+          }
+          result.args.push({ arg, value: numVal });
+        }
+      } else if (config.type === "select") {
+        if (typeof value === "string") {
+          const validOptions = new Set<string>();
+          for (const o of config.options) {
+            if (o.value !== null) {
+              validOptions.add(o.value);
+            }
+          }
+          if (validOptions.has(value)) {
+            result.args.push({ arg, value });
+          }
+        }
+      } else if (config.type === "text") {
+        if (typeof value === "string" && value.trim()) {
+          // Sanitize text inputs
+          const sanitizedValue = value.trim().replace(/[^a-zA-Z0-9_\-\/\.]/g, "");
+          if (sanitizedValue) {
+            result.args.push({ arg, value: sanitizedValue });
+          }
+        }
+      }
+    }
+  }
+
+  // Validate envVars object
+  if (inputObj.envVars && typeof inputObj.envVars === "object") {
+    const allowedEnvVars = getAllowedEnvVars();
+    const envVarValidValues = getEnvVarValidValues();
+
+    for (const [key, value] of Object.entries(inputObj.envVars as Record<string, unknown>)) {
+      if (!allowedEnvVars.has(key)) continue;
+      if (typeof value !== "string") continue;
+      if (!envVarValidValues[key]?.has(value)) continue;
+
+      result.envVars[key] = value;
+    }
+  }
+
+  return result;
+}
+
+// Legacy types for backwards compatibility during migration
 export interface VllmEnvVars {
   VLLM_ATTENTION_BACKEND?: string;
   VLLM_USE_TRITON_FLASH_ATTN?: string;
@@ -257,7 +529,11 @@ export interface VllmEnvVars {
   [key: string]: string | undefined;
 }
 
+// Legacy VllmParams type - now deprecated, use VllmArgsOutput instead
 export interface VllmParams {
+  args?: VllmArg[];
+  envVars?: Record<string, string>;
+  // Legacy fields for reading old submissions
   gpu_memory_utilization?: number;
   max_model_len?: number;
   dtype?: string;
@@ -274,121 +550,75 @@ export interface VllmParams {
   enable_expert_parallel?: boolean;
   disable_custom_all_reduce?: boolean;
   ENV_VARS?: VllmEnvVars;
-  [key: string]: string | number | boolean | VllmEnvVars | undefined;
+  [key: string]: unknown;
 }
 
-// Helper to get default params
+// Legacy helper - deprecated
 export function getDefaultVllmParams(): VllmParams {
-  const params: VllmParams = {};
-  for (const [key, config] of Object.entries(vllmParamsSchema.engineParams)) {
-    if ("default" in config && config.default !== "" && config.default !== undefined) {
-      (params as Record<string, unknown>)[key] = config.default;
-    }
-  }
-  return params;
+  const formState = getDefaultFormState();
+  const output = formStateToArgsOutput(formState);
+  return {
+    args: output.args,
+    envVars: output.envVars,
+  };
 }
 
-// Validation helpers
-export function getAllowedEngineParams(): Set<string> {
-  return new Set([...Object.keys(vllmParamsSchema.engineParams), "ENV_VARS"]);
-}
-
-export function getAllowedEnvVars(): Set<string> {
-  return new Set(Object.keys(vllmParamsSchema.envVars));
-}
-
-export function getEnvVarValidValues(): Record<string, Set<string>> {
-  const result: Record<string, Set<string>> = {};
-  for (const [key, config] of Object.entries(vllmParamsSchema.envVars)) {
-    if (config.type === "select") {
-      result[key] = new Set(
-        config.options.map((opt) => opt.value).filter((v) => v !== "")
-      );
-    }
-  }
-  return result;
-}
-
-export function getAllowedQuantizationMethods(): Set<string> {
-  const quantConfig = vllmParamsSchema.engineParams.quantization;
-  if (quantConfig.type === "select") {
-    return new Set(
-      quantConfig.options.map((opt) => opt.value).filter((v) => v !== "")
-    );
-  }
-  return new Set();
-}
-
-// Validation function for vLLM params
+// Legacy validation - deprecated, use validateAndSanitizeVllmArgs
 export function validateAndSanitizeVllmParams(params: VllmParams | undefined): VllmParams {
   if (!params) return {};
 
-  const sanitized: VllmParams = {};
-  const allowedParams = getAllowedEngineParams();
-  const allowedQuantMethods = getAllowedQuantizationMethods();
-  const allowedEnvVars = getAllowedEnvVars();
-  const envVarValidValues = getEnvVarValidValues();
+  // If new format, validate it
+  if (params.args !== undefined || params.envVars !== undefined) {
+    const validated = validateAndSanitizeVllmArgs(params);
+    return {
+      args: validated.args,
+      envVars: validated.envVars,
+    };
+  }
 
-  for (const [key, value] of Object.entries(params)) {
-    if (!allowedParams.has(key)) continue;
+  // Legacy format - convert to new format
+  const formState: VllmFormState = {
+    engineParams: {},
+    envVars: {},
+  };
 
-    if (key === "ENV_VARS" && typeof value === "object" && value !== null) {
-      const sanitizedEnvVars: VllmEnvVars = {};
-      for (const [envKey, envValue] of Object.entries(value as Record<string, unknown>)) {
-        if (
-          allowedEnvVars.has(envKey) &&
-          typeof envValue === "string" &&
-          envVarValidValues[envKey]?.has(envValue)
-        ) {
-          (sanitizedEnvVars as Record<string, string>)[envKey] = envValue;
-        }
-      }
-      if (Object.keys(sanitizedEnvVars).length > 0) {
-        sanitized.ENV_VARS = sanitizedEnvVars;
-      }
-      continue;
-    }
+  // Map old snake_case keys to new kebab-case keys
+  const keyMapping: Record<string, ConfigurableEngineParamKey> = {
+    gpu_memory_utilization: "gpu-memory-utilization",
+    max_model_len: "max-model-len",
+    dtype: "dtype",
+    quantization: "quantization",
+    kv_cache_dtype: "kv-cache-dtype",
+    tokenizer: "tokenizer",
+    tokenizer_mode: "tokenizer-mode",
+    enforce_eager: "enforce-eager",
+    enable_prefix_caching: "enable-prefix-caching",
+    max_num_seqs: "max-num-seqs",
+    max_num_batched_tokens: "max-num-batched-tokens",
+    max_parallel_loading_workers: "max-parallel-loading-workers",
+    enable_expert_parallel: "enable-expert-parallel",
+    disable_custom_all_reduce: "disable-custom-all-reduce",
+  };
 
-    const paramConfig = vllmParamsSchema.engineParams[key as EngineParamKey];
-    if (!paramConfig) continue;
-
-    // Validate based on type
-    switch (paramConfig.type) {
-      case "number":
-        if (typeof value === "number" && !isNaN(value)) {
-          let numVal = value;
-          if ("min" in paramConfig && numVal < paramConfig.min) numVal = paramConfig.min;
-          if ("max" in paramConfig && numVal > paramConfig.max) numVal = paramConfig.max;
-          (sanitized as Record<string, unknown>)[key] = numVal;
-        }
-        break;
-      case "boolean":
-        if (typeof value === "boolean") {
-          (sanitized as Record<string, unknown>)[key] = value;
-        }
-        break;
-      case "text":
-        if (typeof value === "string" && value.trim()) {
-          // Sanitize text inputs (tokenizer names)
-          const sanitizedValue = value.trim().replace(/[^a-zA-Z0-9_\-\/\.]/g, "");
-          if (sanitizedValue) {
-            (sanitized as Record<string, unknown>)[key] = sanitizedValue;
-          }
-        }
-        break;
-      case "select":
-        if (typeof value === "string") {
-          const validOptions: Set<string> = new Set(paramConfig.options.map((o) => o.value));
-          if (validOptions.has(value)) {
-            if (key === "quantization" && value && !allowedQuantMethods.has(value)) {
-              continue;
-            }
-            (sanitized as Record<string, unknown>)[key] = value;
-          }
-        }
-        break;
+  for (const [oldKey, newKey] of Object.entries(keyMapping)) {
+    const value = params[oldKey];
+    if (value !== undefined && value !== null && value !== "") {
+      formState.engineParams[newKey] = value as string | number | boolean;
     }
   }
 
-  return sanitized;
+  // Handle ENV_VARS
+  if (params.ENV_VARS) {
+    for (const [key, value] of Object.entries(params.ENV_VARS)) {
+      if (value !== undefined && value !== "") {
+        formState.envVars[key as ConfigurableEnvVarKey] = value;
+      }
+    }
+  }
+
+  const output = formStateToArgsOutput(formState);
+  return {
+    args: output.args,
+    envVars: output.envVars,
+  };
 }

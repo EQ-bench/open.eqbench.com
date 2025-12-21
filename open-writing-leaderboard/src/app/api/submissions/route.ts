@@ -6,8 +6,8 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 import { validateHuggingFaceModel, validateGgufUrl } from "@/lib/huggingface";
 import { submissionstatus, Prisma } from "@/generated/prisma/client";
 import {
-  validateAndSanitizeVllmParams,
-  type VllmParams,
+  validateAndSanitizeVllmArgs,
+  type VllmArgsOutput,
 } from "@/lib/vllm-params-configurable-schema";
 import { mergeWithRequiredParams } from "@/lib/vllm-params-required-schema";
 
@@ -22,7 +22,7 @@ interface SubmissionRequest {
   modelType: "huggingface" | "gguf";
   modelId?: string; // For HuggingFace models
   ggufUrl?: string; // For GGUF models
-  vllmParams?: VllmParams;
+  vllmParams?: VllmArgsOutput;
   turnstileToken: string;
 }
 
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate and sanitize user-configurable vLLM params, then merge with required params
-    const userVllmParams = validateAndSanitizeVllmParams(body.vllmParams);
+    const userVllmParams = validateAndSanitizeVllmArgs(body.vllmParams);
     const vllmParams = mergeWithRequiredParams(userVllmParams);
 
     // Validate model based on type

@@ -1,62 +1,51 @@
 // Required vLLM parameters that are enforced by the server
 // These are NOT shown to users and are merged into the final config
 
+import type { VllmArgsOutput, VllmArg } from "./vllm-params-configurable-schema";
+
 export const vllmRequiredParams = {
-  engineParams: {
-    // Engine params that are always enforced
-  },
+  // Args that are always added (will be appended to user args)
+  args: [] as VllmArg[],
+  // Env vars that are always set (merged with user env vars, required takes precedence)
   envVars: {
     // NCCL settings for stability
     NCCL_NET_PLUGIN: "none",
     NCCL_TUNER_PLUGIN: "none",
-  },
-  generationParams: {
-    // Generation params are always server-controlled
-    // These override any user-submitted values
-  },
+  } as Record<string, string>,
 } as const;
 
-export type RequiredEngineParamKey = keyof typeof vllmRequiredParams.engineParams;
-export type RequiredEnvVarKey = keyof typeof vllmRequiredParams.envVars;
-export type RequiredGenerationParamKey = keyof typeof vllmRequiredParams.generationParams;
-
-// Get required engine params as a plain object
-export function getRequiredEngineParams(): Record<string, unknown> {
-  return { ...vllmRequiredParams.engineParams };
+// Get required args
+export function getRequiredArgs(): VllmArg[] {
+  return [...vllmRequiredParams.args];
 }
 
 // Get required env vars as a plain object
 export function getRequiredEnvVars(): Record<string, string> {
-  return { ...vllmRequiredParams.envVars } as Record<string, string>;
-}
-
-// Get required generation params as a plain object
-export function getRequiredGenerationParams(): Record<string, unknown> {
-  return { ...vllmRequiredParams.generationParams };
+  return { ...vllmRequiredParams.envVars };
 }
 
 // Merge user params with required params (required params take precedence)
-export function mergeWithRequiredParams<T extends Record<string, unknown>>(
-  userParams: T
-): T {
-  const requiredEngine = getRequiredEngineParams();
+export function mergeWithRequiredParams(userParams: VllmArgsOutput): VllmArgsOutput {
+  const requiredArgs = getRequiredArgs();
   const requiredEnvVars = getRequiredEnvVars();
 
-  const merged = { ...userParams };
+  // Build a set of required arg names to avoid duplicates
+  const requiredArgNames = new Set(requiredArgs.map(a => a.arg));
 
-  // Merge engine params (required overrides user)
-  for (const [key, value] of Object.entries(requiredEngine)) {
-    (merged as Record<string, unknown>)[key] = value;
-  }
+  // Filter out any user args that conflict with required args, then add required
+  const mergedArgs = [
+    ...userParams.args.filter(a => !requiredArgNames.has(a.arg)),
+    ...requiredArgs,
+  ];
 
-  // Merge env vars (required overrides user)
-  if (Object.keys(requiredEnvVars).length > 0) {
-    const userEnvVars = (merged as Record<string, unknown>).ENV_VARS as Record<string, string> | undefined;
-    (merged as Record<string, unknown>).ENV_VARS = {
-      ...userEnvVars,
-      ...requiredEnvVars,
-    };
-  }
+  // Merge env vars (required takes precedence)
+  const mergedEnvVars = {
+    ...userParams.envVars,
+    ...requiredEnvVars,
+  };
 
-  return merged;
+  return {
+    args: mergedArgs,
+    envVars: mergedEnvVars,
+  };
 }

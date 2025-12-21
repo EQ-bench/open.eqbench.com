@@ -10,9 +10,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, FileText, Plus } from "lucide-react";
+import { User, LogOut, FileText, Plus, Users } from "lucide-react";
 
-export function UserMenu() {
+interface UserMenuProps {
+  isAdmin?: boolean;
+}
+
+export function UserMenu({ isAdmin }: UserMenuProps) {
   const { data: session, status } = useSession();
 
   if (status === "loading") {
@@ -52,6 +56,14 @@ export function UserMenu() {
             My Submissions
           </Link>
         </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link href="/admin/submissions" className="flex items-center">
+              <Users className="mr-2 h-4 w-4" />
+              All Submissions
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => signOut({ callbackUrl: "/" })}

@@ -23,9 +23,9 @@ import {
 import { Loader2, AlertCircle, CheckCircle2, Settings, Lightbulb } from "lucide-react";
 import {
   vllmConfigurableSchema,
-  getDefaultVllmParams,
-  type VllmParams,
-  type VllmEnvVars,
+  getDefaultFormState,
+  formStateToArgsOutput,
+  type VllmFormState,
   type ConfigurableEngineParamKey,
   type ConfigurableEnvVarKey,
 } from "@/lib/vllm-params-configurable-schema";
@@ -48,7 +48,7 @@ export function SubmitForm() {
 
   const [modelType] = useState<ModelType>("huggingface");
   const [modelId, setModelId] = useState("");
-  const [vllmParams, setVllmParams] = useState<VllmParams>(getDefaultVllmParams());
+  const [formState, setFormState] = useState<VllmFormState>(getDefaultFormState());
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,29 +56,24 @@ export function SubmitForm() {
     submissionId: string;
   } | null>(null);
 
-  const updateVllmParam = <K extends keyof VllmParams>(
-    key: K,
-    value: VllmParams[K] | string
-  ) => {
-    setVllmParams((prev) => ({
+  const updateEngineParam = (key: ConfigurableEngineParamKey, value: string | number | boolean | null) => {
+    setFormState((prev) => ({
       ...prev,
-      [key]: value === "" ? undefined : value,
+      engineParams: {
+        ...prev.engineParams,
+        [key]: value,
+      },
     }));
   };
 
-  const updateEnvVar = (key: keyof VllmEnvVars, value: string) => {
-    setVllmParams((prev) => {
-      const newEnvVars = { ...prev.ENV_VARS };
-      if (value === "") {
-        delete newEnvVars[key];
-      } else {
-        newEnvVars[key] = value;
-      }
-      return {
-        ...prev,
-        ENV_VARS: Object.keys(newEnvVars).length > 0 ? newEnvVars : undefined,
-      };
-    });
+  const updateEnvVar = (key: ConfigurableEnvVarKey, value: string | null) => {
+    setFormState((prev) => ({
+      ...prev,
+      envVars: {
+        ...prev.envVars,
+        [key]: value,
+      },
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,13 +94,8 @@ export function SubmitForm() {
 
     setIsSubmitting(true);
 
-    // Filter out undefined/empty params
-    const cleanParams: VllmParams = {};
-    for (const [key, val] of Object.entries(vllmParams)) {
-      if (val !== undefined && val !== "") {
-        cleanParams[key as keyof VllmParams] = val as never;
-      }
-    }
+    // Convert form state to API format
+    const vllmParams = formStateToArgsOutput(formState);
 
     try {
       const response = await fetch("/api/submissions", {
@@ -114,7 +104,7 @@ export function SubmitForm() {
         body: JSON.stringify({
           modelType,
           modelId,
-          vllmParams: cleanParams,
+          vllmParams,
           turnstileToken,
         }),
       });
@@ -158,7 +148,7 @@ export function SubmitForm() {
   // Render a form field based on schema config
   const renderEngineParam = (key: ConfigurableEngineParamKey) => {
     const config = vllmConfigurableSchema.engineParams[key];
-    const paramKey = key as keyof VllmParams;
+    const currentValue = formState.engineParams[key];
 
     switch (config.type) {
       case "number":
@@ -172,13 +162,11 @@ export function SubmitForm() {
               max={config.max}
               step={config.step}
               placeholder={config.placeholder}
-              value={(vllmParams[paramKey] as number | undefined) ?? ""}
-              onChange={(e) =>
-                updateVllmParam(
-                  paramKey,
-                  e.target.value ? parseFloat(e.target.value) : undefined
-                )
-              }
+              value={currentValue !== null && currentValue !== undefined ? String(currentValue) : ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                updateEngineParam(key, val === "" ? null : parseFloat(val));
+              }}
               disabled={isSubmitting}
             />
             <p className="text-xs text-muted-foreground">{config.description}</p>
@@ -192,10 +180,11 @@ export function SubmitForm() {
             <Input
               id={key}
               placeholder={config.placeholder}
-              value={(vllmParams[paramKey] as string | undefined) ?? ""}
-              onChange={(e) =>
-                updateVllmParam(paramKey, e.target.value || undefined)
-              }
+              value={typeof currentValue === "string" ? currentValue : ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                updateEngineParam(key, val === "" ? null : val);
+              }}
               disabled={isSubmitting}
             />
             <p className="text-xs text-muted-foreground">{config.description}</p>
@@ -209,14 +198,15 @@ export function SubmitForm() {
             <select
               id={key}
               className={selectClassName}
-              value={(vllmParams[paramKey] as string | undefined) ?? config.default}
-              onChange={(e) =>
-                updateVllmParam(paramKey, e.target.value || undefined)
-              }
+              value={currentValue === null || currentValue === undefined ? "__null__" : String(currentValue)}
+              onChange={(e) => {
+                const val = e.target.value;
+                updateEngineParam(key, val === "__null__" ? null : val);
+              }}
               disabled={isSubmitting}
             >
               {config.options.map((opt) => (
-                <option key={opt.value} value={opt.value}>
+                <option key={opt.value ?? "__null__"} value={opt.value ?? "__null__"}>
                   {opt.label}
                 </option>
               ))}
@@ -226,24 +216,29 @@ export function SubmitForm() {
         );
 
       case "boolean":
+        // Render as a dropdown with Not Set / True / False
         return (
-          <div key={key} className="space-y-2 flex items-center gap-3">
-            <input
-              type="checkbox"
+          <div key={key} className="space-y-2">
+            <Label htmlFor={key}>{config.label}</Label>
+            <select
               id={key}
-              checked={(vllmParams[paramKey] as boolean | undefined) ?? false}
-              onChange={(e) =>
-                updateVllmParam(paramKey, e.target.checked || undefined)
-              }
+              className={selectClassName}
+              value={currentValue === null || currentValue === undefined ? "__null__" : currentValue === true ? "true" : "false"}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "__null__") {
+                  updateEngineParam(key, null);
+                } else {
+                  updateEngineParam(key, val === "true");
+                }
+              }}
               disabled={isSubmitting}
-              className="h-4 w-4 rounded border-input"
-            />
-            <div>
-              <Label htmlFor={key} className="cursor-pointer">
-                {config.label}
-              </Label>
-              <p className="text-xs text-muted-foreground">{config.description}</p>
-            </div>
+            >
+              <option value="__null__">Not Set</option>
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+            <p className="text-xs text-muted-foreground">{config.description}</p>
           </div>
         );
 
@@ -255,8 +250,7 @@ export function SubmitForm() {
   // Render environment variable field
   const renderEnvVar = (key: ConfigurableEnvVarKey) => {
     const config = vllmConfigurableSchema.envVars[key];
-
-    if (config.type !== "select") return null;
+    const currentValue = formState.envVars[key];
 
     return (
       <div key={key} className="space-y-2">
@@ -264,12 +258,15 @@ export function SubmitForm() {
         <select
           id={key}
           className={selectClassName}
-          value={vllmParams.ENV_VARS?.[key] ?? ""}
-          onChange={(e) => updateEnvVar(key, e.target.value)}
+          value={currentValue === null || currentValue === undefined ? "__null__" : currentValue}
+          onChange={(e) => {
+            const val = e.target.value;
+            updateEnvVar(key, val === "__null__" ? null : val);
+          }}
           disabled={isSubmitting}
         >
           {config.options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
+            <option key={opt.value ?? "__null__"} value={opt.value ?? "__null__"}>
               {opt.label}
             </option>
           ))}
