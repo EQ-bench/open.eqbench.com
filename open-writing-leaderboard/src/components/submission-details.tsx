@@ -25,6 +25,7 @@ import {
   type VllmArg,
   type ConfigurableEngineParamKey,
 } from "@/lib/vllm-params-configurable-schema";
+import { vllmRequiredParams } from "@/lib/vllm-params-required-schema";
 
 type SubmissionStatus = "SUBMITTED" | "QUEUED" | "STARTING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMEOUT" | "CANCELLED";
 
@@ -538,9 +539,10 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
 
           {/* Run Configuration - Expandable */}
           {vllmParams && (hasNewFormat || hasLegacyFormat) && (
-            <Accordion type="single" collapsible className="mt-4">
-              <AccordionItem value="run-config" className="border rounded-lg">
-                <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="mt-4 border rounded-lg">
+              <Accordion type="single" collapsible>
+                <AccordionItem value="run-config" className="border-none">
+                  <AccordionTrigger className="px-4 hover:no-underline">
                   <div className="flex items-center gap-2">
                     <Settings2 className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-medium">Run Configuration</span>
@@ -548,17 +550,22 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
                   <dl className="space-y-3">
-                    {/* New format: args array */}
-                    {hasNewFormat && vllmParams.args && (vllmParams.args as VllmArg[]).map((item) => (
-                      <div key={item.arg} className="flex justify-between items-start gap-4">
-                        <dt className="text-sm text-muted-foreground">
-                          {getArgLabel(item.arg)}
-                        </dt>
-                        <dd className="text-sm font-mono text-right">
-                          {formatArgValue(item.arg, item.value)}
-                        </dd>
-                      </div>
-                    ))}
+                    {/* New format: args array (filter out required args) */}
+                    {hasNewFormat && vllmParams.args && (() => {
+                      const requiredArgNames = new Set(vllmRequiredParams.args.map(a => a.arg));
+                      return (vllmParams.args as VllmArg[])
+                        .filter(item => !requiredArgNames.has(item.arg))
+                        .map((item) => (
+                          <div key={item.arg} className="flex justify-between items-start gap-4">
+                            <dt className="text-sm text-muted-foreground">
+                              {getArgLabel(item.arg)}
+                            </dt>
+                            <dd className="text-sm font-mono text-right">
+                              {formatArgValue(item.arg, item.value)}
+                            </dd>
+                          </div>
+                        ));
+                    })()}
 
                     {/* Legacy format: flat object */}
                     {hasLegacyFormat && Object.entries(vllmParams)
@@ -574,56 +581,68 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
                         </div>
                       ))}
 
-                    {/* Environment variables - new format */}
-                    {hasNewFormat && vllmParams.envVars &&
-                      Object.keys(vllmParams.envVars as Record<string, string>).length > 0 && (
-                        <>
-                          <div className="border-t pt-3 mt-3">
-                            <dt className="text-sm font-medium text-muted-foreground mb-2">
-                              Environment Variables
-                            </dt>
-                          </div>
-                          {Object.entries(vllmParams.envVars as Record<string, string>)
-                            .map(([key, value]) => (
-                              <div key={key} className="flex justify-between items-start gap-4">
-                                <dt className="text-sm text-muted-foreground">
-                                  {getEnvVarLabel(key)}
-                                </dt>
-                                <dd className="text-sm font-mono text-right">
-                                  {formatEnvVarValue(key, value)}
-                                </dd>
-                              </div>
-                            ))}
-                        </>
-                      )}
+                    {/* Environment variables - new format (filter out required env vars) */}
+                    {hasNewFormat && vllmParams.envVars && (() => {
+                      const requiredEnvVarKeys = new Set(Object.keys(vllmRequiredParams.envVars));
+                      const filteredEnvVars = Object.entries(vllmParams.envVars as Record<string, string>)
+                        .filter(([key]) => !requiredEnvVarKeys.has(key));
 
-                    {/* Environment variables - legacy format */}
-                    {hasLegacyFormat && vllmParams.ENV_VARS &&
-                      Object.keys(vllmParams.ENV_VARS).length > 0 && (
+                      if (filteredEnvVars.length === 0) return null;
+
+                      return (
                         <>
                           <div className="border-t pt-3 mt-3">
                             <dt className="text-sm font-medium text-muted-foreground mb-2">
                               Environment Variables
                             </dt>
                           </div>
-                          {Object.entries(vllmParams.ENV_VARS)
-                            .filter(([, value]) => value !== undefined && value !== "")
-                            .map(([key, value]) => (
-                              <div key={key} className="flex justify-between items-start gap-4">
-                                <dt className="text-sm text-muted-foreground">
-                                  {getEnvVarLabel(key)}
-                                </dt>
-                                <dd className="text-sm font-mono text-right">
-                                  {formatEnvVarValue(key, value as string)}
-                                </dd>
-                              </div>
-                            ))}
+                          {filteredEnvVars.map(([key, value]) => (
+                            <div key={key} className="flex justify-between items-start gap-4">
+                              <dt className="text-sm text-muted-foreground">
+                                {getEnvVarLabel(key)}
+                              </dt>
+                              <dd className="text-sm font-mono text-right">
+                                {formatEnvVarValue(key, value)}
+                              </dd>
+                            </div>
+                          ))}
                         </>
-                      )}
+                      );
+                    })()}
+
+                    {/* Environment variables - legacy format (filter out required env vars) */}
+                    {hasLegacyFormat && vllmParams.ENV_VARS && (() => {
+                      const requiredEnvVarKeys = new Set(Object.keys(vllmRequiredParams.envVars));
+                      const filteredEnvVars = Object.entries(vllmParams.ENV_VARS)
+                        .filter(([key, value]) => value !== undefined && value !== "" && !requiredEnvVarKeys.has(key));
+
+                      if (filteredEnvVars.length === 0) return null;
+
+                      return (
+                        <>
+                          <div className="border-t pt-3 mt-3">
+                            <dt className="text-sm font-medium text-muted-foreground mb-2">
+                              Environment Variables
+                            </dt>
+                          </div>
+                          {filteredEnvVars.map(([key, value]) => (
+                            <div key={key} className="flex justify-between items-start gap-4">
+                              <dt className="text-sm text-muted-foreground">
+                                {getEnvVarLabel(key)}
+                              </dt>
+                              <dd className="text-sm font-mono text-right">
+                                {formatEnvVarValue(key, value as string)}
+                              </dd>
+                            </div>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </dl>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+          </div>
           )}
         </CardContent>
       </Card>

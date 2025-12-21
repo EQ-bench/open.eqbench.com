@@ -475,11 +475,13 @@ export function SamplesModal({ modelName, onClose }: SamplesModalProps) {
                               <Skeleton className="h-8 w-full" />
                             </div>
                           ) : matchupDetails[summary.opponent]?.length > 0 ? (
-                            <div className="pt-2 space-y-1 max-h-[300px] overflow-y-auto">
+                            <div className="pt-2 space-y-1">
                               {matchupDetails[summary.opponent].map((detail) => (
                                 <MatchupDetailRow
                                   key={detail.id}
                                   detail={detail}
+                                  viewedModelName={modelName}
+                                  opponentModelName={summary.opponent}
                                 />
                               ))}
                             </div>
@@ -698,8 +700,12 @@ function JudgeScoresSection({
 
 function MatchupDetailRow({
   detail,
+  viewedModelName,
+  opponentModelName,
 }: {
   detail: MatchupDetail;
+  viewedModelName: string | null;
+  opponentModelName: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const winPercent = detail.fractionForModel !== null ? detail.fractionForModel * 100 : null;
@@ -756,7 +762,12 @@ function MatchupDetailRow({
 
       {expanded && detail.judgeResponses != null && (
         <div className="border-t px-3 py-2 text-xs space-y-3">
-          <JudgeResponsesDisplay responses={detail.judgeResponses} />
+          <JudgeResponsesDisplay
+            responses={detail.judgeResponses}
+            viewedModelName={viewedModelName}
+            opponentModelName={opponentModelName}
+            isViewedModelA={detail.isModelA}
+          />
         </div>
       )}
     </div>
@@ -775,9 +786,17 @@ interface JudgeResponseItem {
   outcome: number;
 }
 
-function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
-  const [expandedReasoning, setExpandedReasoning] = useState<Set<number>>(new Set());
-
+function JudgeResponsesDisplay({
+  responses,
+  viewedModelName,
+  opponentModelName,
+  isViewedModelA,
+}: {
+  responses: unknown;
+  viewedModelName: string | null;
+  opponentModelName: string;
+  isViewedModelA: boolean;
+}) {
   // Parse the array of judge responses
   const responseArray: JudgeResponseItem[] = Array.isArray(responses)
     ? responses
@@ -786,18 +805,6 @@ function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
   if (responseArray.length === 0) {
     return <div className="text-muted-foreground">No judge responses available</div>;
   }
-
-  const toggleReasoning = (index: number) => {
-    setExpandedReasoning((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
-  };
 
   // Parse dimension score like "A0493++" or "B1234-"
   const parseDimensionScore = (value: string): { modelCode: string; magnitude: number; magnitudeStr: string } | null => {
@@ -818,7 +825,7 @@ function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
     };
   };
 
-  // Parse order field like "A0493:test / A0488:other"
+  // Parse order field like "A0493:test / A0488:other" to extract model codes
   const parseOrderField = (order: string | undefined): Map<string, "test" | "other"> | null => {
     if (!order) return null;
     const mapping = new Map<string, "test" | "other">();
@@ -843,6 +850,7 @@ function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
   ]);
 
   // Infer mapping by calculating totals and matching to plus_for_test/plus_for_other
+  // This is needed when the order field is missing
   const inferMapping = (
     dimensions: Array<{ key: string; modelCode: string; magnitude: number }>,
     plusForTest: number,
@@ -850,11 +858,9 @@ function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
   ): Map<string, "test" | "other"> | null => {
     // Get unique model codes
     const codes = [...new Set(dimensions.map(d => d.modelCode))];
-    if (codes.length !== 2) return null;
+    if (codes.length === 0) return null;
 
-    const [code1, code2] = codes;
-
-    // Calculate totals for each possible mapping
+    // Calculate totals assuming a given code is "test"
     // For regular dimensions: winner gets +magnitude
     // For negative dimensions: winner gets +magnitude, loser gets -magnitude
     const calculateTotals = (testCode: string) => {
@@ -880,6 +886,27 @@ function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
 
       return { testTotal, otherTotal };
     };
+
+    // Handle case where one model won ALL dimensions (only one code present)
+    if (codes.length === 1) {
+      const code = codes[0];
+      // Try this code as test
+      const totals = calculateTotals(code);
+      if (totals.testTotal === plusForTest && totals.otherTotal === plusForOther) {
+        const mapping = new Map<string, "test" | "other">();
+        mapping.set(code, "test");
+        return mapping;
+      }
+      // Try this code as other (swap the expected values)
+      if (totals.otherTotal === plusForTest && totals.testTotal === plusForOther) {
+        const mapping = new Map<string, "test" | "other">();
+        mapping.set(code, "other");
+        return mapping;
+      }
+      return null;
+    }
+
+    const [code1, code2] = codes;
 
     // Try code1 as test
     const totals1 = calculateTotals(code1);
@@ -925,15 +952,24 @@ function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
           typeof judgeResponse.chain_of_thought_reasoning === "string" &&
           judgeResponse.chain_of_thought_reasoning.length > 0;
 
-        // Try to get mapping from order field first, then infer from dimension totals
-        let mapping = parseOrderField(item.order);
-        if (!mapping) {
-          mapping = inferMapping(
+        // Get the code-to-role mapping from the order field, or infer it from dimension totals
+        // "test" in the mapping always refers to model_a in the comparison
+        let codeToRoleMapping = parseOrderField(item.order);
+        if (!codeToRoleMapping) {
+          // Fallback: infer mapping by matching dimension totals to plus_for_test/plus_for_other
+          codeToRoleMapping = inferMapping(
             dimensions.map(d => ({ key: d.key, modelCode: d.parsed.modelCode, magnitude: d.parsed.magnitude })),
             item.plus_for_test,
             item.plus_for_other
           );
         }
+
+        // Determine if each dimension was won by the viewed model
+        // - If isViewedModelA: viewed model is "test", so "test" wins are our wins
+        // - If !isViewedModelA: viewed model is "other", so "other" wins are our wins
+        const isWinForViewed = (role: "test" | "other") => {
+          return isViewedModelA ? role === "test" : role === "other";
+        };
 
         return (
           <div key={idx} className="space-y-2">
@@ -946,11 +982,10 @@ function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
             {dimensions.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 {dimensions.map(({ key, parsed }) => {
-                  const role = mapping?.get(parsed.modelCode);
-                  const isWin = role === "test";
-                  const isLoss = role === "other";
+                  const role = codeToRoleMapping?.get(parsed.modelCode);
+                  const isWin = role ? isWinForViewed(role) : null;
                   // If we can't determine, show the raw model code
-                  const label = isWin ? "Win" : isLoss ? "Loss" : parsed.modelCode;
+                  const label = isWin === true ? "Win" : isWin === false ? "Loss" : parsed.modelCode;
 
                   return (
                     <div
@@ -962,9 +997,9 @@ function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
                       </span>
                       <span
                         className={`font-mono font-medium shrink-0 ${
-                          isWin
+                          isWin === true
                             ? "text-green-600 dark:text-green-400"
-                            : isLoss
+                            : isWin === false
                             ? "text-red-600 dark:text-red-400"
                             : "text-muted-foreground"
                         }`}
@@ -982,30 +1017,37 @@ function JudgeResponsesDisplay({ responses }: { responses: unknown }) {
               </div>
             )}
 
-            {/* Chain of thought reasoning - collapsible */}
-            {hasReasoning && (
-              <div>
-                <button
-                  type="button"
-                  onClick={() => toggleReasoning(idx)}
-                  className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                >
-                  <ChevronRight
-                    className={`h-3 w-3 transition-transform ${
-                      expandedReasoning.has(idx) ? "rotate-90" : ""
-                    }`}
-                  />
-                  <span className="text-xs font-medium uppercase">Reasoning</span>
-                </button>
-                {expandedReasoning.has(idx) && (
-                  <div className="mt-2 text-xs text-muted-foreground bg-muted/30 rounded p-2 max-h-[200px] overflow-y-auto">
+            {/* Chain of thought reasoning - always shown */}
+            {hasReasoning && (() => {
+              // Substitute model codes with actual model names in reasoning text
+              let reasoningText = judgeResponse.chain_of_thought_reasoning as string;
+              if (codeToRoleMapping) {
+                for (const [code, role] of codeToRoleMapping.entries()) {
+                  // Map role to actual model name based on isViewedModelA
+                  // - "test" role = model_a = viewedModel if isViewedModelA, else opponent
+                  // - "other" role = model_b = opponent if isViewedModelA, else viewedModel
+                  const displayName = role === "test"
+                    ? (isViewedModelA ? (viewedModelName || "Test Model") : opponentModelName)
+                    : (isViewedModelA ? opponentModelName : (viewedModelName || "Test Model"));
+                  reasoningText = reasoningText.replace(
+                    new RegExp(`\\b${code}\\b`, "g"),
+                    displayName
+                  );
+                }
+              }
+              return (
+                <div>
+                  <div className="text-xs font-medium uppercase text-muted-foreground mb-1">
+                    Reasoning
+                  </div>
+                  <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2">
                     <pre className="whitespace-pre-wrap font-sans">
-                      {judgeResponse.chain_of_thought_reasoning as string}
+                      {reasoningText}
                     </pre>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              );
+            })()}
           </div>
         );
       })}
