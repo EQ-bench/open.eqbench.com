@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, Clock, CheckCircle2, XCircle, Loader2, Sparkles, Scale, Settings2 } from "lucide-react";
+import { ExternalLink, Clock, CheckCircle2, XCircle, Loader2, Sparkles, Scale, Settings2, AlertTriangle, Lightbulb } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {
   vllmParamsSchema,
@@ -26,6 +26,7 @@ import {
   type ConfigurableEngineParamKey,
 } from "@/lib/vllm-params-configurable-schema";
 import { vllmRequiredParams } from "@/lib/vllm-params-required-schema";
+import { extractErrors, extractErrorsFromLogs, type ExtractedError } from "@/lib/extract-errors";
 
 type SubmissionStatus = "SUBMITTED" | "QUEUED" | "STARTING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "TIMEOUT" | "CANCELLED";
 
@@ -265,11 +266,20 @@ function formatLegacyParamValue(key: string, value: unknown): string {
   return String(value);
 }
 
+interface LogEntry {
+  id: number;
+  ts: string;
+  stream: string;
+  data: string;
+}
+
 export function SubmissionDetails({ initialSubmission, initialRunInfo }: SubmissionDetailsProps) {
   const [submission, setSubmission] = useState(initialSubmission);
   const [runInfo, setRunInfo] = useState(initialRunInfo);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const isInProgress = ["SUBMITTED", "QUEUED", "STARTING", "RUNNING"].includes(submission.status);
+  const isFailedStatus = ["FAILED", "TIMEOUT", "CANCELLED"].includes(submission.status);
 
   const fetchSubmission = useCallback(async () => {
     try {
@@ -288,6 +298,21 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
     }
   }, [submission.id]);
 
+  // Fetch logs when submission has failed (for error extraction)
+  const fetchLogs = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/submissions/${submission.id}/logs`);
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (data.logs) {
+        setLogs(data.logs);
+      }
+    } catch (error) {
+      console.error("Failed to fetch logs:", error);
+    }
+  }, [submission.id]);
+
   // Auto-refresh when in progress
   useEffect(() => {
     if (!isInProgress) return;
@@ -295,6 +320,19 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
     const interval = setInterval(fetchSubmission, 5000);
     return () => clearInterval(interval);
   }, [isInProgress, fetchSubmission]);
+
+  // Fetch logs once when status becomes failed
+  useEffect(() => {
+    if (isFailedStatus) {
+      fetchLogs();
+    }
+  }, [isFailedStatus, fetchLogs]);
+
+  // Extract errors from logs
+  const extractedLogErrors = useMemo(() => {
+    if (!isFailedStatus || logs.length === 0) return [];
+    return extractErrorsFromLogs(logs);
+  }, [logs, isFailedStatus]);
 
   const submissionParams = submission.params;
   const vllmParams = submissionParams?.vllmParams;
@@ -648,18 +686,65 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo }: Submiss
       </Card>
 
       {/* Error Card */}
-      {submission.error_msg && (
-        <Card className="mb-6 border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive">Error Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm">
-              {submission.error_msg}
-            </pre>
-          </CardContent>
-        </Card>
-      )}
+      {submission.error_msg && (() => {
+        // Combine errors from logs (preferred) and error_msg (fallback)
+        const errorMsgErrors = extractErrors(submission.error_msg);
+        // Use log errors if available, otherwise fall back to error_msg extraction
+        const extractedErrors = extractedLogErrors.length > 0 ? extractedLogErrors : errorMsgErrors;
+
+        return (
+          <Card className="mb-6 border-destructive">
+            <CardHeader>
+              <CardTitle className="text-destructive">Error Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Extracted Error Summary */}
+              {extractedErrors.length > 0 && (
+                <div className="space-y-3">
+                  {extractedErrors.map((error: ExtractedError, index: number) => (
+                    <div
+                      key={index}
+                      className="rounded-lg border border-destructive/30 bg-destructive/5 p-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                        <div className="space-y-2 flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="destructive" className="text-xs">
+                              {error.category}
+                            </Badge>
+                          </div>
+                          <p className="text-sm font-medium">{error.message}</p>
+                          {error.suggestion && (
+                            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <Lightbulb className="h-4 w-4 shrink-0 mt-0.5" />
+                              <span>{error.suggestion}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Raw Error Output */}
+              <Accordion type="single" collapsible defaultValue={extractedErrors.length === 0 ? "raw-error" : undefined}>
+                <AccordionItem value="raw-error" className="border rounded-lg">
+                  <AccordionTrigger className="px-4 hover:no-underline text-sm">
+                    Raw Error Output
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4">
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs whitespace-pre-wrap break-all">
+                      {submission.error_msg}
+                    </pre>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Results Card */}
       {runInfo?.results && submission.status === "SUCCEEDED" && (

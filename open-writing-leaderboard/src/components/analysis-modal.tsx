@@ -8,6 +8,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  StrengthsWeaknessesList,
+  ProficienciesRadarChart,
+  RubricBarChart,
+  ProficiencyData,
+} from "./proficiencies-chart";
 
 interface LexicalAnalysis {
   slop_words_per_1k: number;
@@ -32,6 +38,10 @@ interface ModelData {
 interface LexicalResponse {
   models: ModelData[];
   ranges: Record<string, { min: number; max: number }>;
+}
+
+interface ProficienciesResponse {
+  proficiencies: Record<string, ProficiencyData>;
 }
 
 interface AnalysisModalProps {
@@ -123,11 +133,15 @@ const DISPLAY_METRICS: (keyof LexicalAnalysis)[] = [
 
 export function AnalysisModal({ modelName, onClose }: AnalysisModalProps) {
   const [data, setData] = useState<LexicalResponse | null>(null);
+  const [proficiencies, setProficiencies] = useState<ProficienciesResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [proficienciesLoading, setProficienciesLoading] = useState(false);
 
   useEffect(() => {
     if (modelName) {
       setLoading(true);
+      setProficienciesLoading(true);
+
       fetch("/api/lexical-analysis")
         .then((res) => res.json())
         .then((responseData: LexicalResponse) => {
@@ -137,10 +151,21 @@ export function AnalysisModal({ modelName, onClose }: AnalysisModalProps) {
         .catch(() => {
           setLoading(false);
         });
+
+      fetch("/api/proficiencies")
+        .then((res) => res.json())
+        .then((responseData: ProficienciesResponse) => {
+          setProficiencies(responseData);
+          setProficienciesLoading(false);
+        })
+        .catch(() => {
+          setProficienciesLoading(false);
+        });
     }
   }, [modelName]);
 
   const selectedModel = data?.models.find((m) => m.model === modelName);
+  const proficiencyData = modelName ? proficiencies?.proficiencies[modelName] : null;
 
   const getNormalizedWidth = (metric: keyof LexicalAnalysis, value: number) => {
     const range = data?.ranges[metric];
@@ -153,15 +178,17 @@ export function AnalysisModal({ modelName, onClose }: AnalysisModalProps) {
     return value.toFixed(decimals);
   };
 
+  const isLoading = loading || proficienciesLoading;
+
   return (
     <Dialog open={modelName !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
+      <DialogContent className="sm:max-w-[calc(100vw-64px)] md:max-w-4xl xl:max-w-7xl h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Lexical Analysis — {modelName}</DialogTitle>
+          <DialogTitle>Analysis — {modelName}</DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-4 p-4">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="space-y-2">
@@ -170,84 +197,129 @@ export function AnalysisModal({ modelName, onClose }: AnalysisModalProps) {
                 </div>
               ))}
             </div>
-          ) : !selectedModel ? (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground p-8">
-              <p>No lexical analysis data available for this model.</p>
-            </div>
           ) : (
-            <div className="space-y-6 p-4">
-              {DISPLAY_METRICS.map((metric) => {
-                const value = selectedModel.lexical_analysis[metric];
-                const config = METRIC_CONFIG[metric];
-                const range = data?.ranges[metric];
-                const width = getNormalizedWidth(metric, value);
+            <div className="p-4">
+              {/* Large screens: 3 columns */}
+              <div className="hidden xl:grid xl:grid-cols-3 xl:gap-6">
+                {/* Column 1: Rubric Scores */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">RUBRIC SCORES</h3>
+                  {proficiencyData ? (
+                    <RubricBarChart data={proficiencyData} />
+                  ) : (
+                    <div className="text-sm text-muted-foreground py-4">
+                      No rubric data available.
+                    </div>
+                  )}
+                </div>
 
-                return (
-                  <div key={metric} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium">{config.label}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {config.description}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-mono text-sm font-medium">
-                          {formatValue(metric, value)}
-                        </div>
-                        {range && (
-                          <div className="text-xs text-muted-foreground">
-                            range: {formatValue(metric, range.min)} - {formatValue(metric, range.max)}
-                          </div>
-                        )}
-                      </div>
+                {/* Column 2: Proficiencies */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">PROFICIENCIES</h3>
+                  {proficiencyData ? (
+                    <div className="space-y-4">
+                      <ProficienciesRadarChart data={proficiencyData} />
+                      <StrengthsWeaknessesList data={proficiencyData} initialCount={5} />
                     </div>
-                    <div className="relative h-6 overflow-hidden rounded bg-muted">
-                      <div
-                        className={`absolute inset-y-0 left-0 rounded transition-all ${
-                          config.lowerIsBetter
-                            ? "bg-gradient-to-r from-green-500 to-red-500"
-                            : "bg-gradient-to-r from-chart-1 to-chart-2"
-                        }`}
-                        style={{ width: `${width}%` }}
-                      />
-                      <div
-                        className="absolute inset-y-0 flex items-center px-2 text-xs font-mono font-medium"
-                        style={{
-                          left: `${Math.min(width, 85)}%`,
-                          color: width > 50 ? "white" : "inherit",
-                        }}
-                      >
-                        {formatValue(metric, value)}
-                      </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground py-4">
+                      No proficiency data available.
                     </div>
-                  </div>
-                );
-              })}
+                  )}
+                </div>
 
-              <div className="border-t pt-6 mt-6">
-                <h3 className="text-sm font-medium mb-4 text-muted-foreground">
-                  CORPUS STATISTICS
-                </h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="rounded-lg bg-muted/50 p-4 text-center">
-                    <div className="text-2xl font-mono font-bold">
-                      {selectedModel.lexical_analysis.total_words.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">Total Words</div>
+                {/* Column 3: Lexical Analysis */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">LEXICAL ANALYSIS</h3>
+                  <LexicalAnalysisSection
+                    selectedModel={selectedModel}
+                    data={data}
+                    getNormalizedWidth={getNormalizedWidth}
+                    formatValue={formatValue}
+                  />
+                </div>
+              </div>
+
+              {/* Medium screens: 2 columns */}
+              <div className="hidden md:grid md:grid-cols-2 md:gap-6 xl:hidden">
+                {/* Column 1: Proficiencies + Rubric */}
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium text-muted-foreground">PROFICIENCIES</h3>
+                    {proficiencyData ? (
+                      <div className="space-y-4">
+                        <ProficienciesRadarChart data={proficiencyData} />
+                        <StrengthsWeaknessesList data={proficiencyData} initialCount={3} />
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground py-4">
+                        No proficiency data available.
+                      </div>
+                    )}
                   </div>
-                  <div className="rounded-lg bg-muted/50 p-4 text-center">
-                    <div className="text-2xl font-mono font-bold">
-                      {selectedModel.lexical_analysis.total_chars.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">Total Characters</div>
+
+                  <div className="space-y-4 border-t pt-6">
+                    <h3 className="text-sm font-medium text-muted-foreground">RUBRIC SCORES</h3>
+                    {proficiencyData ? (
+                      <RubricBarChart data={proficiencyData} compact />
+                    ) : (
+                      <div className="text-sm text-muted-foreground py-4">
+                        No rubric data available.
+                      </div>
+                    )}
                   </div>
-                  <div className="rounded-lg bg-muted/50 p-4 text-center">
-                    <div className="text-2xl font-mono font-bold">
-                      {selectedModel.lexical_analysis.num_turns.toLocaleString()}
+                </div>
+
+                {/* Column 2: Lexical Analysis */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">LEXICAL ANALYSIS</h3>
+                  <LexicalAnalysisSection
+                    selectedModel={selectedModel}
+                    data={data}
+                    getNormalizedWidth={getNormalizedWidth}
+                    formatValue={formatValue}
+                  />
+                </div>
+              </div>
+
+              {/* Small screens: 1 column */}
+              <div className="md:hidden space-y-6">
+                {/* Proficiencies */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-medium text-muted-foreground">PROFICIENCIES</h3>
+                  {proficiencyData ? (
+                    <div className="space-y-4">
+                      <ProficienciesRadarChart data={proficiencyData} />
+                      <StrengthsWeaknessesList data={proficiencyData} initialCount={3} />
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">Response Turns</div>
-                  </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground py-4">
+                      No proficiency data available.
+                    </div>
+                  )}
+                </div>
+
+                {/* Lexical Analysis */}
+                <div className="space-y-4 border-t pt-6">
+                  <h3 className="text-sm font-medium text-muted-foreground">LEXICAL ANALYSIS</h3>
+                  <LexicalAnalysisSection
+                    selectedModel={selectedModel}
+                    data={data}
+                    getNormalizedWidth={getNormalizedWidth}
+                    formatValue={formatValue}
+                  />
+                </div>
+
+                {/* Rubric Scores */}
+                <div className="space-y-4 border-t pt-6">
+                  <h3 className="text-sm font-medium text-muted-foreground">RUBRIC SCORES</h3>
+                  {proficiencyData ? (
+                    <RubricBarChart data={proficiencyData} compact />
+                  ) : (
+                    <div className="text-sm text-muted-foreground py-4">
+                      No rubric data available.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -255,5 +327,99 @@ export function AnalysisModal({ modelName, onClose }: AnalysisModalProps) {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function LexicalAnalysisSection({
+  selectedModel,
+  data,
+  getNormalizedWidth,
+  formatValue,
+}: {
+  selectedModel: ModelData | undefined;
+  data: LexicalResponse | null;
+  getNormalizedWidth: (metric: keyof LexicalAnalysis, value: number) => number;
+  formatValue: (metric: keyof LexicalAnalysis, value: number) => string;
+}) {
+  if (!selectedModel) {
+    return (
+      <div className="text-muted-foreground py-4 text-sm">
+        No lexical analysis data available.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {DISPLAY_METRICS.map((metric) => {
+        const value = selectedModel.lexical_analysis[metric];
+        const config = METRIC_CONFIG[metric];
+        const range = data?.ranges[metric];
+        const width = getNormalizedWidth(metric, value);
+
+        return (
+          <div key={metric} className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">{config.label}</div>
+                <div className="text-xs text-muted-foreground">{config.description}</div>
+              </div>
+              <div className="text-right">
+                <div className="font-mono text-sm font-medium">{formatValue(metric, value)}</div>
+                {range && (
+                  <div className="text-xs text-muted-foreground">
+                    range: {formatValue(metric, range.min)} - {formatValue(metric, range.max)}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="relative h-5 overflow-hidden rounded bg-muted">
+              <div
+                className={`absolute inset-y-0 left-0 rounded transition-all ${
+                  config.lowerIsBetter
+                    ? "bg-gradient-to-r from-green-500 to-red-500"
+                    : "bg-gradient-to-r from-chart-1 to-chart-2"
+                }`}
+                style={{ width: `${width}%` }}
+              />
+              <div
+                className="absolute inset-y-0 flex items-center px-2 text-xs font-mono font-medium"
+                style={{
+                  left: `${Math.min(width, 85)}%`,
+                  color: width > 50 ? "white" : "inherit",
+                }}
+              >
+                {formatValue(metric, value)}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Corpus Statistics */}
+      <div className="border-t pt-4 mt-4">
+        <h4 className="text-xs font-medium mb-3 text-muted-foreground">CORPUS STATISTICS</h4>
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-lg bg-muted/50 p-3 text-center">
+            <div className="text-lg font-mono font-bold">
+              {selectedModel.lexical_analysis.total_words.toLocaleString()}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">Words</div>
+          </div>
+          <div className="rounded-lg bg-muted/50 p-3 text-center">
+            <div className="text-lg font-mono font-bold">
+              {selectedModel.lexical_analysis.total_chars.toLocaleString()}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">Chars</div>
+          </div>
+          <div className="rounded-lg bg-muted/50 p-3 text-center">
+            <div className="text-lg font-mono font-bold">
+              {selectedModel.lexical_analysis.num_turns.toLocaleString()}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">Turns</div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
