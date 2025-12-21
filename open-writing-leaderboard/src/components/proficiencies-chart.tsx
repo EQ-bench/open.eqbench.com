@@ -164,14 +164,15 @@ export function RubricBarChart({ data, compact = false }: RubricBarChartProps) {
   const barData = Object.entries(data.absoluteScores)
     .map(([criterion, value]) => ({
       criterion,
-      value: Math.round(value * 100) / 100,
+      value: Math.round((value / 2) * 100) / 100, // Convert 0-20 to 0-10
     }))
     .sort((a, b) => b.value - a.value);
 
   const getBarColor = (value: number) => {
-    if (value >= 16) return "hsl(142, 76%, 36%)"; // green
-    if (value >= 12) return "hsl(48, 96%, 53%)"; // yellow
-    if (value >= 8) return "hsl(25, 95%, 53%)"; // orange
+    // Adjusted thresholds for 0-10 scale (was 16/12/8 for 0-20)
+    if (value >= 8) return "hsl(142, 76%, 36%)"; // green
+    if (value >= 6) return "hsl(48, 96%, 53%)"; // yellow
+    if (value >= 4) return "hsl(25, 95%, 53%)"; // orange
     return "hsl(0, 84%, 60%)"; // red
   };
 
@@ -194,7 +195,7 @@ export function RubricBarChart({ data, compact = false }: RubricBarChartProps) {
             <div
               className={`h-full ${roundedClass} transition-all`}
               style={{
-                width: `${(item.value / 20) * 100}%`,
+                width: `${(item.value / 10) * 100}%`, // Now 0-10 scale
                 backgroundColor: getBarColor(item.value),
               }}
             />
