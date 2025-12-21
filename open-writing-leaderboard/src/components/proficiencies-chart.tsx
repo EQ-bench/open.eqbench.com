@@ -110,27 +110,27 @@ export function ProficienciesRadarChart({ data }: RadarChartSectionProps) {
   const domain = [-Math.ceil(maxAbs * 10) / 10, Math.ceil(maxAbs * 10) / 10];
 
   return (
-    <div className="h-[280px] w-full">
+    <div className="h-[280px] w-full text-muted-foreground">
       <ResponsiveContainer width="100%" height="100%">
         <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
-          <PolarGrid stroke="var(--color-muted-foreground)" strokeOpacity={0.3} />
+          <PolarGrid stroke="currentColor" strokeOpacity={0.3} />
           <PolarAngleAxis
             dataKey="criterion"
-            tick={{ fontSize: 9, fill: "var(--color-muted-foreground)" }}
+            tick={{ fontSize: 9, fill: "currentColor" }}
             tickLine={false}
           />
           <PolarRadiusAxis
             angle={90}
             domain={domain}
-            tick={{ fontSize: 8, fill: "var(--color-muted-foreground)" }}
+            tick={{ fontSize: 8, fill: "currentColor" }}
             tickCount={5}
             axisLine={false}
           />
           <Radar
             name="Relative Score"
             dataKey="value"
-            stroke="hsl(var(--chart-1))"
-            fill="hsl(var(--chart-1))"
+            stroke="oklch(0.6 0.2 260)"
+            fill="oklch(0.6 0.2 260)"
             fillOpacity={0.3}
             strokeWidth={2}
           />
