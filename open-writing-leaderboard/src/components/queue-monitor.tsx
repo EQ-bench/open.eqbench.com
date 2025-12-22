@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Timer, Loader2, CheckCircle2, XCircle, Clock, PauseCircle } from "lucide-react";
+import { Timer, Loader2, CheckCircle2, XCircle, Clock, PauseCircle, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -214,6 +215,14 @@ export function QueueMonitor() {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {getStatusBadge(submission.status, submission.priority_score)}
+                        <Link
+                          href={`/submissions/${submission.id}`}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          title="View submission details"
+                          onClick={() => setOpen(false)}
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
                       </div>
                     </div>
                   );
@@ -244,8 +253,16 @@ export function QueueMonitor() {
                         {submission.finished_at && formatTime(submission.finished_at)}
                       </span>
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       {getStatusBadge(submission.status)}
+                      <Link
+                        href={`/submissions/${submission.id}`}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        title="View submission details"
+                        onClick={() => setOpen(false)}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
                     </div>
                   </div>
                 ))}

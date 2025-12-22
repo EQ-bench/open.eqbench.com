@@ -793,10 +793,12 @@ export function SubmissionDetails({ initialSubmission, initialRunInfo, isOwner =
                 </AccordionItem>
               </Accordion>
 
-              {/* AI Help Wizard */}
-              <div className="border-t pt-4">
-                <ErrorHelpWizard submissionId={submission.id} />
-              </div>
+              {/* AI Help Wizard - only show to submission owner */}
+              {isOwner && (
+                <div className="border-t pt-4">
+                  <ErrorHelpWizard submissionId={submission.id} />
+                </div>
+              )}
             </CardContent>
           </Card>
         );
