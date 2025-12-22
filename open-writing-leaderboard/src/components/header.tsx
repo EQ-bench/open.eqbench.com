@@ -22,6 +22,7 @@ export async function Header() {
   const userRole = await getUserRole();
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* Main header row */}
       <div className="container mx-auto flex h-14 items-center px-4">
         <div className="flex items-center space-x-3">
           <a href="/" className="flex-shrink-0">
@@ -50,12 +51,25 @@ export async function Header() {
             </a>
           </div>
         </div>
-        <nav className="ml-auto flex items-center space-x-4">
+        {/* Desktop nav */}
+        <nav className="ml-auto hidden sm:flex items-center space-x-4">
           <QueueMonitor />
           <ThemeToggle />
           <SubmitButton />
           <UserMenu isAdmin={userRole === "admin"} />
         </nav>
+        {/* Mobile: just user menu in header */}
+        <div className="ml-auto flex sm:hidden items-center">
+          <UserMenu isAdmin={userRole === "admin"} />
+        </div>
+      </div>
+      {/* Mobile nav row */}
+      <div className="sm:hidden border-t border-border/50 bg-muted/30">
+        <div className="container mx-auto flex h-10 items-center justify-center gap-4 px-4">
+          <QueueMonitor />
+          <ThemeToggle />
+          <SubmitButton />
+        </div>
       </div>
     </header>
   );

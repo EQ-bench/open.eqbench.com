@@ -16,6 +16,10 @@ import { Badge } from "@/components/ui/badge";
 import { SamplesModal } from "@/components/samples-modal";
 import { AnalysisModal } from "@/components/analysis-modal";
 import { RunDetailsModal } from "@/components/run-details-modal";
+import {
+  ScoreBarPaletteSelector,
+  scoreBarPalettes,
+} from "@/components/score-bar-palette-selector";
 
 interface Rating {
   model_name: string;
@@ -36,6 +40,9 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
   const [analysisModalModel, setAnalysisModalModel] = useState<string | null>(null);
   const [runDetailsModalModel, setRunDetailsModalModel] = useState<string | null>(null);
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
+  const [paletteId, setPaletteId] = useState("purple-to-pink");
+
+  const palette = scoreBarPalettes.find((p) => p.id === paletteId) ?? scoreBarPalettes[0];
 
   const handleDelete = async (modelName: string) => {
     if (!confirm(`Are you sure you want to delete "${modelName}" from the leaderboard?\n\nThis will also delete all associated runs and data. This action cannot be undone.`)) {
@@ -80,6 +87,8 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
 
   return (
     <>
+      {/* <ScoreBarPaletteSelector value={paletteId} onChange={setPaletteId} /> */}
+
       <p className="text-center text-sm text-muted-foreground mb-4">
         [BETA] Leaderboard will reset at launch
       </p>
@@ -87,12 +96,12 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">Rank</TableHead>
+              <TableHead className="w-16"><span className="hidden sm:inline">Rank</span></TableHead>
               <TableHead className="min-w-[133px] w-[60%]">Model</TableHead>
-              <TableHead className="min-w-[100px] w-[40%]">ELO Score</TableHead>
-              <TableHead className="w-24 text-center"><span className="hidden sm:inline">Samples</span></TableHead>
-              <TableHead className="w-24 text-center"><span className="hidden sm:inline">Analysis</span></TableHead>
-              {isAdmin && <TableHead className="w-16 text-center"></TableHead>}
+              <TableHead className="min-w-[70px] w-[40%]">ELO Score</TableHead>
+              <TableHead className="w-10 sm:w-24 text-center"><span className="hidden sm:inline">Samples</span></TableHead>
+              <TableHead className="w-10 sm:w-24 text-center"><span className="hidden sm:inline">Analysis</span></TableHead>
+              {isAdmin && <TableHead className="w-10 sm:w-16 text-center"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -100,7 +109,7 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
               const rank = index + 1;
               return (
                 <TableRow key={rating.model_name}>
-                  <TableCell>
+                  <TableCell className="pr-0 sm:pr-2">
                     <Badge variant={getRankBadgeVariant(rank)} className="font-mono">
                       {rank}
                     </Badge>
@@ -119,19 +128,25 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-0.5 sm:gap-3">
                       <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
                         <div
-                          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-chart-1 to-chart-2 transition-all"
-                          style={{ width: `${getEloBarWidth(rating.elo)}%` }}
+                          className={`absolute inset-y-0 left-0 h-full rounded-full transition-all ${palette.gradient} border border-[#000] dark:border-0`}
+                          style={{
+                            width: `${getEloBarWidth(rating.elo)}%`,
+                            backgroundSize: getEloBarWidth(rating.elo) > 0
+                              ? `${100 / (getEloBarWidth(rating.elo) / 100)}% 100%`
+                              : '100% 100%',
+                            backgroundPosition: 'left',
+                          }}
                         />
                       </div>
-                      <span className="w-16 text-right font-mono text-sm">
+                      <span className="w-12 sm:w-16 text-right font-mono text-sm">
                         {rating.elo?.toFixed(0) ?? "—"}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center px-0 sm:px-2">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -142,7 +157,7 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
                       <FileText className="h-4 w-4" />
                     </Button>
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center px-0 sm:px-2">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -154,7 +169,7 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
                     </Button>
                   </TableCell>
                   {isAdmin && (
-                    <TableCell className="text-center">
+                    <TableCell className="text-center px-0 sm:px-2">
                       <Button
                         variant="ghost"
                         size="icon"

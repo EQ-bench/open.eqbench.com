@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
-import { LeaderboardWithPalette } from "@/components/leaderboard-with-palette";
+import { Leaderboard } from "@/components/leaderboard";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,7 @@ export default async function Home() {
 
   return (
     <div className="space-y-8">
-      <LeaderboardWithPalette ratings={ratings} isAdmin={userRole === "admin"} />
+      <Leaderboard ratings={ratings} isAdmin={userRole === "admin"} />
     </div>
   );
 }
