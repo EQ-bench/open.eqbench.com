@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, BarChart3, ExternalLink, Trash2 } from "lucide-react";
+import { FileText, BarChart3, Info, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SamplesModal } from "@/components/samples-modal";
 import { AnalysisModal } from "@/components/analysis-modal";
+import { RunDetailsModal } from "@/components/run-details-modal";
 
 interface Rating {
   model_name: string;
@@ -29,34 +30,11 @@ interface LeaderboardProps {
   isAdmin?: boolean;
 }
 
-/**
- * Extract the Hugging Face model page URL from various model name formats:
- * - "deepseek-ai/DeepSeek-V3.2" -> "https://huggingface.co/deepseek-ai/DeepSeek-V3.2"
- * - "deepseek-ai/DeepSeek-V3.2:*Q3_K_M.gguf" -> "https://huggingface.co/deepseek-ai/DeepSeek-V3.2"
- * - "https://huggingface.co/unsloth/Qwen3-Next-80B-A3B-Instruct-GGUF/tree/main/Q8_0:*Q8_0*.gguf" -> "https://huggingface.co/unsloth/Qwen3-Next-80B-A3B-Instruct-GGUF"
- */
-function getHuggingFaceUrl(modelName: string): string {
-  // If it's already a full URL, extract org/model from the path
-  if (modelName.startsWith("https://huggingface.co/")) {
-    const urlPath = modelName.replace("https://huggingface.co/", "");
-    // Extract just org/model (first two path segments)
-    const parts = urlPath.split("/");
-    if (parts.length >= 2) {
-      return `https://huggingface.co/${parts[0]}/${parts[1]}`;
-    }
-    return modelName.split(":")[0]; // fallback
-  }
-
-  // Remove any filename pattern suffix (after colon)
-  const baseModel = modelName.split(":")[0];
-
-  return `https://huggingface.co/${baseModel}`;
-}
-
 export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
   const router = useRouter();
   const [samplesModalModel, setSamplesModalModel] = useState<string | null>(null);
   const [analysisModalModel, setAnalysisModalModel] = useState<string | null>(null);
+  const [runDetailsModalModel, setRunDetailsModalModel] = useState<string | null>(null);
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
 
   const handleDelete = async (modelName: string) => {
@@ -128,15 +106,17 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-medium whitespace-normal break-all">
-                    <a
-                      href={getHuggingFaceUrl(rating.model_name)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-primary hover:underline"
-                    >
+                    <span className="inline-flex items-center gap-1">
                       {rating.model_name}
-                      <ExternalLink className="h-3.5 w-3.5 inline-block ml-1.5 flex-shrink-0 opacity-50" />
-                    </a>
+                      <button
+                        type="button"
+                        onClick={() => setRunDetailsModalModel(rating.model_name)}
+                        className="inline-flex items-center justify-center h-5 w-5 rounded hover:bg-accent/80 transition-colors cursor-pointer flex-shrink-0"
+                        title="View run details"
+                      >
+                        <Info className="h-5 w-5 opacity-50 hover:opacity-100" />
+                      </button>
+                    </span>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -202,6 +182,11 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
       <AnalysisModal
         modelName={analysisModalModel}
         onClose={() => setAnalysisModalModel(null)}
+      />
+
+      <RunDetailsModal
+        modelName={runDetailsModalModel}
+        onClose={() => setRunDetailsModalModel(null)}
       />
     </>
   );

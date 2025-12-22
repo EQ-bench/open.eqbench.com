@@ -339,23 +339,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Failed to get help response" }, { status: 502 });
     }
 
-    // Log the help request for rate limiting (don't await, fire and forget)
-    prisma.event_log.create({
-      data: {
-        event_type: "help_request",
-        submission_id: id,
-        user_id: user.id,
-        ip: ipHash,
-        details: {
-          user_id: user.id,
-          ip_hash: ipHash,
-        },
-      },
-    }).catch((err) => console.error("Failed to log help request:", err));
-
     // Return the prompt along with the streaming response
     // We'll use a custom format: first line is JSON with prompt, then SSE stream
     const encoder = new TextEncoder();
+
+    // Variables to capture usage from stream
+    let capturedUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -394,6 +383,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
                   if (content) {
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content })}\n\n`));
                   }
+                  // Capture usage from the final message (OpenRouter sends it in the last chunk)
+                  if (parsed.usage) {
+                    capturedUsage = parsed.usage;
+                  }
                 } catch {
                   // Ignore parse errors
                 }
@@ -403,6 +396,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         } finally {
           reader.releaseLock();
           controller.close();
+
+          // Log the help request with usage info after stream completes
+          prisma.event_log.create({
+            data: {
+              event_type: "help_request",
+              submission_id: id,
+              user_id: user.id,
+              ip: ipHash,
+              details: {
+                user_id: user.id,
+                ip_hash: ipHash,
+                usage: capturedUsage,
+              },
+            },
+          }).catch((err) => console.error("Failed to log help request:", err));
         }
       },
     });

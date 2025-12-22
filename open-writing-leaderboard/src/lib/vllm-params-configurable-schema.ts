@@ -201,7 +201,7 @@ export const vllmParamsSchema = {
       description: "Maximum number of batched tokens per iteration",
       min: 1,
       max: 131072,
-      step: 1024,
+      step: 1,
       placeholder: "Default",
       default: null,
     },
