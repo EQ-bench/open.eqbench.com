@@ -87,7 +87,7 @@ export const vllmParamsSchema = {
       arg: "--max-model-len",
       label: "Max Model Length",
       description: "Maximum context length for the model (allowed range: 16k-65k). Needs to fit planning turn + 3 chapters.",
-      min: 16384,
+      min: 16000,
       max: 65536,
       step: 1,
       placeholder: "32768",
