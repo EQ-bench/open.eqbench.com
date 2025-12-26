@@ -35,7 +35,7 @@ export async function GET(
       iteration_index: true,
       aggregated_scores: true,
     },
-    orderBy: { prompt_id: "asc" },
+    orderBy: { id: "asc" },
   });
 
   return NextResponse.json({ samples: tasks });

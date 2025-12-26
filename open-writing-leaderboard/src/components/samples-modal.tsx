@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { ChevronDown, ChevronRight, Trophy } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import {
   Dialog,
   DialogContent,
@@ -550,9 +551,11 @@ function SampleContent({ response }: { response: SampleResponse }) {
             <div className="text-base font-semibold mb-3">
               Chapter {turn.chapter_number ?? turn.turn_index}
             </div>
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-              {turn.assistant_response || "No response"}
-            </pre>
+            <div className="text-sm leading-relaxed [&>p]:mb-4 [&>p:last-child]:mb-0">
+              <ReactMarkdown>
+                {turn.assistant_response || "No response"}
+              </ReactMarkdown>
+            </div>
           </div>
         ))}
       </div>
@@ -560,9 +563,11 @@ function SampleContent({ response }: { response: SampleResponse }) {
   }
 
   return (
-    <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed bg-muted/30 p-3 rounded-lg">
-      {singleResponse || "No response available"}
-    </pre>
+    <div className="text-sm leading-relaxed [&>p]:mb-4 [&>p:last-child]:mb-0 bg-muted/30 p-3 rounded-lg">
+      <ReactMarkdown>
+        {singleResponse || "No response available"}
+      </ReactMarkdown>
+    </div>
   );
 }
 
