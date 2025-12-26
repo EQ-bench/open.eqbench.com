@@ -123,7 +123,7 @@ export function Leaderboard({ ratings, isAdmin }: LeaderboardProps) {
                         className="inline-flex items-center justify-center h-5 w-5 rounded hover:bg-accent/80 transition-colors cursor-pointer flex-shrink-0"
                         title="View run details"
                       >
-                        <Info className="h-5 w-5 opacity-50 hover:opacity-100" />
+                        <Info className="h-4 w-4 opacity-50 hover:opacity-100" />
                       </button>
                     </span>
                   </TableCell>
