@@ -85,6 +85,7 @@ export function SamplesModal({ modelName, onClose }: SamplesModalProps) {
   const [expandedOpponent, setExpandedOpponent] = useState<string | null>(null);
   const [matchupDetails, setMatchupDetails] = useState<Record<string, MatchupDetail[]>>({});
   const [loadingOpponentDetails, setLoadingOpponentDetails] = useState<Set<string>>(new Set());
+  const [pendingScrollTarget, setPendingScrollTarget] = useState<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -206,21 +207,26 @@ export function SamplesModal({ modelName, onClose }: SamplesModalProps) {
       if (!isNaN(taskId)) {
         loadSampleResponse(taskId);
         loadJudgeResults(taskId);
+        // Set pending scroll target - will scroll once content loads
+        setPendingScrollTarget(taskId);
       }
-    }
-
-    // Scroll to the newly expanded item
-    if (value && scrollContainerRef.current) {
-      setTimeout(() => {
-        const element = document.getElementById(`sample-${value}`);
-        if (element && scrollContainerRef.current) {
-          const container = scrollContainerRef.current;
-          const elementTop = element.offsetTop - container.offsetTop;
-          container.scrollTo({ top: elementTop - 16, behavior: "smooth" });
-        }
-      }, 100);
+    } else {
+      setPendingScrollTarget(null);
     }
   };
+
+  // Scroll to the expanded item once its content has loaded
+  useEffect(() => {
+    if (pendingScrollTarget !== null && loadedResponses[pendingScrollTarget] && scrollContainerRef.current) {
+      const element = document.getElementById(`sample-${pendingScrollTarget}`);
+      if (element) {
+        const container = scrollContainerRef.current;
+        const elementTop = element.offsetTop - container.offsetTop;
+        container.scrollTo({ top: elementTop - 16, behavior: "smooth" });
+      }
+      setPendingScrollTarget(null);
+    }
+  }, [pendingScrollTarget, loadedResponses]);
 
   const getOverallScore = (scores: Record<string, number> | null): number | null => {
     if (!scores) return null;
